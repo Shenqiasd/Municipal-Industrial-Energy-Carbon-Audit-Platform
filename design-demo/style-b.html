@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>方案B - 绿色低碳风</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #f4f6f4; color: #1a2e1a; }
+
+  :root {
+    --primary: #00897B;
+    --primary-light: #e0f2f0;
+    --primary-dark: #005f56;
+    --sidebar-bg: #1b2e2b;
+    --sidebar-active: rgba(0,137,123,0.25);
+    --green-accent: #43a047;
+    --bg: #f4f6f4;
+    --card-bg: #fff;
+    --border: #e8ede8;
+    --text: #1a2e1a;
+    --text-2: #546e56;
+    --text-3: #8fa890;
+  }
+
+  /* ===== 登录页 ===== */
+  .login-page {
+    width: 1440px; height: 900px; display: flex;
+    background: linear-gradient(160deg, #0d2b26 0%, #1b4a3d 40%, #0a3d2e 100%);
+    position: relative; overflow: hidden;
+  }
+  .login-page::after {
+    content: ''; position: absolute;
+    width: 600px; height: 600px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,137,123,0.15) 0%, transparent 70%);
+    top: -100px; right: 300px; pointer-events: none;
+  }
+  .login-left {
+    flex: 1; display: flex; flex-direction: column; justify-content: center;
+    padding: 80px; position: relative; z-index: 1;
+  }
+  .login-logo { display: flex; align-items: center; gap: 16px; margin-bottom: 56px; }
+  .login-logo-icon {
+    width: 56px; height: 56px;
+    background: linear-gradient(135deg, #00897B, #43a047);
+    border-radius: 16px; display: flex; align-items: center; justify-content: center;
+    font-size: 28px; box-shadow: 0 8px 24px rgba(0,137,123,0.4);
+  }
+  .login-logo-text h1 { font-size: 22px; color: #fff; font-weight: 700; letter-spacing: 1px; }
+  .login-logo-text p { font-size: 13px; color: rgba(255,255,255,0.4); margin-top: 2px; }
+  .login-hero h2 { font-size: 44px; color: #fff; font-weight: 700; line-height: 1.25; margin-bottom: 20px; }
+  .login-hero h2 em { color: #4db6ac; font-style: normal; }
+  .login-hero p { font-size: 15px; color: rgba(255,255,255,0.5); line-height: 1.9; max-width: 420px; }
+  .leaf-tags { display: flex; gap: 12px; margin-top: 40px; flex-wrap: wrap; }
+  .leaf-tag {
+    padding: 7px 16px; background: rgba(0,137,123,0.15); border: 1px solid rgba(0,137,123,0.3);
+    border-radius: 20px; font-size: 13px; color: #4db6ac;
+  }
+  .login-stats { display: flex; gap: 40px; margin-top: 48px; padding-top: 32px; border-top: 1px solid rgba(255,255,255,0.08); }
+  .login-stat-item h3 { font-size: 30px; color: #4db6ac; font-weight: 700; }
+  .login-stat-item p { font-size: 12px; color: rgba(255,255,255,0.35); margin-top: 4px; }
+
+  .login-right {
+    width: 480px; display: flex; align-items: center; justify-content: center;
+    position: relative; z-index: 1;
+    background: rgba(255,255,255,0.04); border-left: 1px solid rgba(255,255,255,0.07);
+    backdrop-filter: blur(12px);
+  }
+  .login-card {
+    width: 360px; background: #fff; border-radius: 20px;
+    padding: 48px 40px; box-shadow: 0 24px 64px rgba(0,0,0,0.35);
+  }
+  .login-card h3 { font-size: 24px; font-weight: 700; color: #1a2e1a; margin-bottom: 6px; }
+  .login-card .sub { font-size: 14px; color: #8fa890; margin-bottom: 32px; }
+  .portal-tabs { display: flex; gap: 6px; margin-bottom: 28px; background: #f4f6f4; padding: 4px; border-radius: 10px; }
+  .portal-tab {
+    flex: 1; padding: 9px 0; text-align: center; font-size: 13px; font-weight: 500;
+    border-radius: 7px; cursor: pointer; color: #8fa890; transition: all 0.2s;
+  }
+  .portal-tab.active { background: #fff; color: var(--primary); box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .form-group { margin-bottom: 18px; }
+  .form-label { font-size: 13px; color: #546e56; font-weight: 500; margin-bottom: 7px; display: block; }
+  .form-input {
+    width: 100%; padding: 11px 14px; border: 1.5px solid var(--border); border-radius: 8px;
+    font-size: 14px; outline: none; color: #1a2e1a; background: #fafbfa;
+    transition: border-color 0.2s;
+  }
+  .form-input:focus { border-color: var(--primary); background: #fff; }
+  .form-input::placeholder { color: #b0bdb0; }
+  .login-btn {
+    width: 100%; padding: 13px; background: linear-gradient(135deg, #00897B, #43a047);
+    color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600;
+    cursor: pointer; margin-top: 6px; box-shadow: 0 6px 20px rgba(0,137,123,0.3);
+  }
+  .login-footer { text-align: center; margin-top: 22px; font-size: 13px; color: #8fa890; }
+  .login-footer a { color: var(--primary); text-decoration: none; }
+
+  /* ===== 主布局 ===== */
+  .main-layout {
+    width: 1440px; height: 900px; display: flex; margin-top: 40px; overflow: hidden;
+    border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+  }
+  .sidebar {
+    width: 224px; background: var(--sidebar-bg); display: flex; flex-direction: column; flex-shrink: 0;
+  }
+  .sidebar-header {
+    padding: 18px 18px 16px; border-bottom: 1px solid rgba(255,255,255,0.06);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .sidebar-icon {
+    width: 36px; height: 36px; background: linear-gradient(135deg, #00897B, #43a047);
+    border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  .sidebar-title { font-size: 14px; color: #fff; font-weight: 600; line-height: 1.3; }
+  .sidebar-subtitle { font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 2px; }
+  .sidebar-menu { flex: 1; padding: 10px 0; overflow-y: auto; }
+  .menu-section { padding: 8px 16px 4px; font-size: 10.5px; color: rgba(255,255,255,0.22); letter-spacing: 1.5px; text-transform: uppercase; }
+  .menu-item {
+    display: flex; align-items: center; gap: 10px; padding: 9px 14px;
+    cursor: pointer; font-size: 13.5px; color: rgba(255,255,255,0.48);
+    transition: all 0.15s; border-radius: 8px; margin: 1px 8px;
+  }
+  .menu-item:hover { color: #fff; background: rgba(255,255,255,0.06); }
+  .menu-item.active { color: #fff; background: var(--sidebar-active); }
+  .menu-item.active .menu-dot { background: #4db6ac; }
+  .menu-dot { width: 5px; height: 5px; border-radius: 50%; background: transparent; flex-shrink: 0; }
+  .menu-icon { font-size: 14px; width: 18px; text-align: center; flex-shrink: 0; }
+  .menu-badge {
+    margin-left: auto; background: #ef5350; color: #fff; font-size: 10px;
+    padding: 1px 6px; border-radius: 10px; font-weight: 600;
+  }
+  .sidebar-footer {
+    padding: 12px 16px; border-top: 1px solid rgba(255,255,255,0.06);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .user-avatar {
+    width: 34px; height: 34px; background: linear-gradient(135deg, #00897B, #43a047);
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 13px; color: #fff; font-weight: 700; flex-shrink: 0;
+  }
+  .user-name { font-size: 12.5px; color: rgba(255,255,255,0.7); }
+  .user-sub { font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 1px; }
+
+  /* ===== 内容区 ===== */
+  .content-area { flex: 1; display: flex; flex-direction: column; background: var(--bg); overflow: hidden; }
+  .topbar {
+    height: 54px; background: #fff; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px; flex-shrink: 0;
+  }
+  .breadcrumb { font-size: 13px; color: var(--text-3); }
+  .breadcrumb strong { color: var(--text); }
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
+  .topbar-chip {
+    padding: 5px 14px; background: var(--primary-light); border: 1px solid rgba(0,137,123,0.2);
+    border-radius: 20px; font-size: 12.5px; color: var(--primary); font-weight: 500;
+  }
+  .topbar-btn {
+    width: 34px; height: 34px; background: var(--bg); border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    font-size: 15px; position: relative;
+  }
+  .notif-dot { position: absolute; top: 7px; right: 7px; width: 6px; height: 6px; background: #ef5350; border-radius: 50%; }
+
+  .main-content { flex: 1; padding: 20px 24px; overflow-y: auto; }
+  .page-title { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 3px; }
+  .page-desc { font-size: 13px; color: var(--text-3); margin-bottom: 18px; }
+
+  /* 统计卡片 */
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 18px; }
+  .stat-card {
+    background: #fff; border-radius: 12px; padding: 18px 20px;
+    border: 1px solid var(--border);
+  }
+  .stat-label { font-size: 12.5px; color: var(--text-3); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .stat-label-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .stat-value { font-size: 26px; font-weight: 700; color: var(--text); }
+  .stat-unit { font-size: 12px; color: var(--text-3); margin-left: 4px; }
+  .stat-trend { font-size: 12px; margin-top: 6px; color: var(--text-3); }
+  .down { color: var(--primary); }
+  .up { color: #ef5350; }
+  .stat-bar { height: 3px; background: var(--border); border-radius: 2px; margin-top: 12px; overflow: hidden; }
+  .stat-bar-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--primary), var(--green-accent)); }
+
+  /* 能耗卡片特殊样式 */
+  .stat-card.highlight {
+    background: linear-gradient(135deg, var(--primary), var(--green-accent));
+    border: none;
+  }
+  .stat-card.highlight .stat-label { color: rgba(255,255,255,0.7); }
+  .stat-card.highlight .stat-value { color: #fff; }
+  .stat-card.highlight .stat-unit { color: rgba(255,255,255,0.6); }
+  .stat-card.highlight .stat-trend { color: rgba(255,255,255,0.7); }
+
+  /* 两栏布局 */
+  .bottom-grid { display: grid; grid-template-columns: 1fr 340px; gap: 14px; }
+  .card { background: #fff; border-radius: 12px; padding: 18px 20px; border: 1px solid var(--border); }
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .card-title { font-size: 14.5px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 8px; }
+  .card-title-dot { width: 10px; height: 10px; border-radius: 3px; background: var(--primary); }
+  .card-action { font-size: 12.5px; color: var(--primary); cursor: pointer; }
+
+  /* 进度 */
+  .progress-list { display: flex; flex-direction: column; gap: 12px; }
+  .progress-item { }
+  .progress-header { display: flex; justify-content: space-between; margin-bottom: 5px; }
+  .progress-name { font-size: 13px; color: var(--text-2); }
+  .progress-pct { font-size: 12px; color: var(--text-3); }
+  .progress-bar { height: 5px; background: #e8ede8; border-radius: 3px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 3px; }
+
+  /* 任务 */
+  .task-list { display: flex; flex-direction: column; gap: 8px; }
+  .task-item {
+    display: flex; align-items: center; gap: 10px; padding: 11px 12px;
+    background: var(--bg); border-radius: 8px; border: 1px solid var(--border);
+  }
+  .task-icon { font-size: 16px; flex-shrink: 0; }
+  .task-info { flex: 1; }
+  .task-name { font-size: 13px; color: var(--text); font-weight: 500; }
+  .task-meta { font-size: 11.5px; color: var(--text-3); margin-top: 1px; }
+  .task-chip {
+    font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 500; white-space: nowrap;
+  }
+
+  /* 表格 */
+  .table-page { margin-top: 40px; width: 1440px; }
+  .table-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .toolbar-left { display: flex; gap: 10px; }
+  .btn-primary {
+    padding: 8px 18px; background: var(--primary); color: #fff; border: none;
+    border-radius: 7px; font-size: 13px; font-weight: 500; cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .btn-default {
+    padding: 8px 16px; background: #fff; color: var(--text-2); border: 1.5px solid var(--border);
+    border-radius: 7px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px;
+  }
+  .search-wrap { position: relative; }
+  .search-input {
+    padding: 8px 12px 8px 34px; border: 1.5px solid var(--border); border-radius: 7px;
+    font-size: 13px; outline: none; width: 220px; background: #fff; color: var(--text);
+  }
+  .search-input:focus { border-color: var(--primary); }
+  .search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: #b0bdb0; }
+
+  .data-table { width: 100%; background: #fff; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
+  .data-table table { width: 100%; border-collapse: collapse; }
+  .data-table th {
+    padding: 12px 16px; background: #f8faf8; font-size: 12.5px; color: var(--text-3);
+    font-weight: 500; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap;
+  }
+  .data-table td { padding: 13px 16px; font-size: 13px; color: var(--text-2); border-bottom: 1px solid #f0f4f0; }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: #f8fdf8; }
+  .status-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 500; }
+  .op-link { color: var(--primary); cursor: pointer; font-size: 13px; }
+  .op-link + .op-link { margin-left: 12px; }
+  .op-link.danger { color: #ef5350; }
+  .pagination { display: flex; justify-content: space-between; align-items: center; padding: 13px 16px; border-top: 1px solid var(--border); }
+  .page-info { font-size: 13px; color: var(--text-3); }
+  .page-btns { display: flex; gap: 6px; }
+  .page-btn { width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 13px; color: var(--text-2); background: #fff; }
+  .page-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+</style>
+</head>
+<body style="background:#eaede8; padding: 40px;">
+
+<div style="font-size:22px; font-weight:800; color:#1a2e1a; margin-bottom:8px;">方案 B &nbsp;—&nbsp; 绿色低碳风</div>
+<div style="font-size:14px; color:#546e56; margin-bottom:32px;">主色：#00897B 绿 &nbsp;|&nbsp; 侧栏：#1b2e2b 深墨绿 &nbsp;|&nbsp; 背景：#f4f6f4 &nbsp;|&nbsp; 风格：低碳/环保主题，更贴合能碳审计定位</div>
+
+<!-- 登录页 -->
+<div style="font-size:14px; font-weight:600; color:#546e56; margin-bottom:12px;">① 登录页</div>
+<div class="login-page">
+  <div class="login-left">
+    <div class="login-logo">
+      <div class="login-logo-icon">🌿</div>
+      <div class="login-logo-text">
+        <h1>能碳审计管理平台</h1>
+        <p>Municipal Industrial Energy Carbon Audit Platform</p>
+      </div>
+    </div>
+    <div class="login-hero">
+      <h2>推动工业企业<br><em>绿色低碳</em>转型</h2>
+      <p>服务政府能源审计与碳排放管理，以数字化手段驱动工业节能降碳，助力城市"双碳"战略落地。</p>
+    </div>
+    <div class="leaf-tags">
+      <span class="leaf-tag">🏭 工业能源审计</span>
+      <span class="leaf-tag">🌍 碳排放管理</span>
+      <span class="leaf-tag">📊 节能分析</span>
+      <span class="leaf-tag">📑 报告生成</span>
+    </div>
+    <div class="login-stats">
+      <div class="login-stat-item"><h3>2,841</h3><p>接入企业数</p></div>
+      <div class="login-stat-item"><h3>12.4万</h3><p>累计节能量(吨标煤)</p></div>
+      <div class="login-stat-item"><h3>8.6万</h3><p>碳减排量(tCO₂)</p></div>
+    </div>
+  </div>
+  <div class="login-right">
+    <div class="login-card">
+      <h3>欢迎登录</h3>
+      <div class="sub">选择登录身份开始使用</div>
+      <div class="portal-tabs">
+        <div class="portal-tab active">企业端</div>
+        <div class="portal-tab">管理端</div>
+        <div class="portal-tab">审核端</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">账号</label>
+        <input class="form-input" placeholder="统一社会信用代码或用户名" value="91310000123456789X">
+      </div>
+      <div class="form-group">
+        <label class="form-label">密码</label>
+        <input class="form-input" type="password" placeholder="请输入密码" value="••••••••">
+      </div>
+      <button class="login-btn">登 录</button>
+      <div class="login-footer"><a href="#">申请注册</a> &nbsp;·&nbsp; <a href="#">忘记密码</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- 工作台 -->
+<div style="font-size:14px; font-weight:600; color:#546e56; margin:40px 0 12px;">② 工作台 / Dashboard</div>
+<div class="main-layout">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-icon">🌿</div>
+      <div><div class="sidebar-title">能碳审计平台</div><div class="sidebar-subtitle">企业端</div></div>
+    </div>
+    <div class="sidebar-menu">
+      <div class="menu-section">工作台</div>
+      <div class="menu-item active"><div class="menu-dot"></div><span class="menu-icon">🏠</span>概览</div>
+
+      <div class="menu-section">基础设置</div>
+      <div class="menu-item"><div class="menu-dot"></div><span class="menu-icon">🏢</span>企业信息</div>
+      <div class="menu-item"><div class="menu-dot"></div><span class="menu-icon">⚡</span>能源品种</div>
+      <div class="menu-item"><div class="menu-dot"></div><span class="menu-icon">🔧</span>用能单元</div>
+      <div class="menu-item"><div class="menu-dot"></div><span class="menu-icon">📦</span>产品设置</div>
+
+      <div class="menu-section">数据录入</div>
+      <div class="menu-item"><div class="menu-dot"></div><span class="menu-icon">📊</span>企业概况</div>
+      <div class="menu-item"><div class="menu-dot"></div><span class="menu-icon">📈</span>主要技术指标</div>
+      <div class="menu-item"><div class="menu-dot"></div><span class="menu-icon">🔌</span>计量器具</div>
+      <div class="menu-item"><div class="menu-dot"></div><span class="menu-icon">🌊</span>能源流程图</div>
+      <div class="menu-item"><div class="menu-dot"></div><span class="menu-icon">🌡️</span>温室气体排放 <span class="menu-badge">!</span></div>
+      <div class="menu-item"><div class="menu-dot"></div><span class="menu-icon">💡</span>节能潜力明细</div>
+
+      <div class="menu-section">报告</div>
+      <div class="menu-item"><div class="menu-dot"></div><span class="menu-icon">📑</span>审计报告 <span class="menu-badge">1</span></div>
+      <div class="menu-item"><div class="menu-dot"></div><span class="menu-icon">📤</span>提交审核</div>
+    </div>
+    <div class="sidebar-footer">
+      <div class="user-avatar">沪</div>
+      <div>
+        <div class="user-name">上海XX制造有限公司</div>
+        <div class="user-sub">2024 审计年度</div>
+      </div>
+    </div>
+  </div>
+  <div class="content-area">
+    <div class="topbar">
+      <div class="breadcrumb">能碳审计平台 / <strong>工作台</strong></div>
+      <div class="topbar-right">
+        <div class="topbar-chip">🗓 审计年度：2024</div>
+        <div class="topbar-btn">🔔<div class="notif-dot"></div></div>
+        <div class="topbar-btn">👤</div>
+      </div>
+    </div>
+    <div class="main-content">
+      <div class="page-title">工作台</div>
+      <div class="page-desc">上海XX制造有限公司 · 2024年度能碳审计数据汇总</div>
+      <div class="stats-grid">
+        <div class="stat-card highlight">
+          <div class="stat-label"><span class="stat-label-dot" style="background:rgba(255,255,255,0.5)"></span>综合能耗（当量值）</div>
+          <div><span class="stat-value">12,847</span><span class="stat-unit">吨标煤</span></div>
+          <div class="stat-trend down">↓ 3.2% 较上年同期</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label"><span class="stat-label-dot" style="background:#4db6ac"></span>碳排放总量</div>
+          <div><span class="stat-value">8,234</span><span class="stat-unit">tCO₂</span></div>
+          <div class="stat-trend down">↓ 5.1% 较上年同期</div>
+          <div class="stat-bar"><div class="stat-bar-fill" style="width:65%"></div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label"><span class="stat-label-dot" style="background:#66bb6a"></span>单位产值能耗</div>
+          <div><span class="stat-value">0.183</span><span class="stat-unit">吨标煤/万元</span></div>
+          <div class="stat-trend down">↓ 7.8% 较上年同期</div>
+          <div class="stat-bar"><div class="stat-bar-fill" style="width:82%"></div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label"><span class="stat-label-dot" style="background:#ffa726"></span>填报完整度</div>
+          <div><span class="stat-value">78</span><span class="stat-unit">%</span></div>
+          <div class="stat-trend" style="color:#ffa726">⚠ 还有 4 个模块未填报</div>
+          <div class="stat-bar"><div class="stat-bar-fill" style="width:78%;background:linear-gradient(90deg,#ffa726,#ffca28)"></div></div>
+        </div>
+      </div>
+      <div class="bottom-grid">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><div class="card-title-dot"></div>填报进度</div>
+            <div class="card-action">查看详情 →</div>
+          </div>
+          <div class="progress-list">
+            <div class="progress-item">
+              <div class="progress-header"><span class="progress-name">基本设置（企业/能源/单元/产品）</span><span class="progress-pct">100%</span></div>
+              <div class="progress-bar"><div class="progress-fill" style="width:100%;background:#43a047"></div></div>
+            </div>
+            <div class="progress-item">
+              <div class="progress-header"><span class="progress-name">企业概况 & 主要技术指标</span><span class="progress-pct">100%</span></div>
+              <div class="progress-bar"><div class="progress-fill" style="width:100%;background:#43a047"></div></div>
+            </div>
+            <div class="progress-item">
+              <div class="progress-header"><span class="progress-name">能源计量器具汇总</span><span class="progress-pct">80%</span></div>
+              <div class="progress-bar"><div class="progress-fill" style="width:80%;background:var(--primary)"></div></div>
+            </div>
+            <div class="progress-item">
+              <div class="progress-header"><span class="progress-name">能源流程图</span><span class="progress-pct">60%</span></div>
+              <div class="progress-bar"><div class="progress-fill" style="width:60%;background:var(--primary)"></div></div>
+            </div>
+            <div class="progress-item">
+              <div class="progress-header"><span class="progress-name">温室气体排放表</span><span class="progress-pct">0%</span></div>
+              <div class="progress-bar"><div class="progress-fill" style="width:0%;background:#ef5350"></div></div>
+            </div>
+            <div class="progress-item">
+              <div class="progress-header"><span class="progress-name">审计报告生成与提交</span><span class="progress-pct">0%</span></div>
+              <div class="progress-bar"><div class="progress-fill" style="width:0%;background:#ef5350"></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title"><div class="card-title-dot"></div>当前待办</div></div>
+          <div class="task-list">
+            <div class="task-item">
+              <span class="task-icon">🔴</span>
+              <div class="task-info">
+                <div class="task-name">温室气体排放表填报</div>
+                <div class="task-meta">截止 2024-12-31 · 已逾期</div>
+              </div>
+              <span class="task-chip" style="background:#fdecea;color:#ef5350">逾期</span>
+            </div>
+            <div class="task-item">
+              <span class="task-icon">🟡</span>
+              <div class="task-info">
+                <div class="task-name">节能潜力明细填报</div>
+                <div class="task-meta">截止 2025-01-15</div>
+              </div>
+              <span class="task-chip" style="background:#fff8e1;color:#ffa726">待填</span>
+            </div>
+            <div class="task-item">
+              <span class="task-icon">🔵</span>
+              <div class="task-info">
+                <div class="task-name">能源流程图完善</div>
+                <div class="task-meta">进行中 · 60% 完成</div>
+              </div>
+              <span class="task-chip" style="background:#e0f2f0;color:var(--primary)">进行中</span>
+            </div>
+            <div class="task-item">
+              <span class="task-icon">✅</span>
+              <div class="task-info">
+                <div class="task-name">基本设置配置</div>
+                <div class="task-meta">完成于 2024-11-20</div>
+              </div>
+              <span class="task-chip" style="background:#e8f5e9;color:#43a047">已完成</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 表格页 -->
+<div style="font-size:14px; font-weight:600; color:#546e56; margin:40px 0 12px;">③ 数据录入表格</div>
+<div class="main-layout table-page" style="margin-top:0;height:auto;border-radius:12px;overflow:visible;">
+  <div class="sidebar" style="border-radius:12px 0 0 12px;">
+    <div class="sidebar-header">
+      <div class="sidebar-icon">🌿</div>
+      <div><div class="sidebar-title">能碳审计平台</div><div class="sidebar-subtitle">企业端</div></div>
+    </div>
+    <div class="sidebar-menu">
+      <div class="menu-section">数据录入</div>
+      <div class="menu-item"><div class="menu-dot"></div><span class="menu-icon">📊</span>企业概况</div>
+      <div class="menu-item"><div class="menu-dot"></div><span class="menu-icon">📈</span>主要技术指标</div>
+      <div class="menu-item active"><div class="menu-dot"></div><span class="menu-icon">🏗️</span>节能技改项目</div>
+      <div class="menu-item"><div class="menu-dot"></div><span class="menu-icon">🔌</span>计量器具汇总</div>
+      <div class="menu-item"><div class="menu-dot"></div><span class="menu-icon">📐</span>计量器具配备率</div>
+      <div class="menu-item"><div class="menu-dot"></div><span class="menu-icon">⚙️</span>重点设备汇总</div>
+      <div class="menu-item"><div class="menu-dot"></div><span class="menu-icon">🌊</span>能源流程图</div>
+      <div class="menu-item"><div class="menu-dot"></div><span class="menu-icon">🌡️</span>温室气体排放 <span class="menu-badge">!</span></div>
+    </div>
+    <div class="sidebar-footer">
+      <div class="user-avatar">沪</div>
+      <div><div class="user-name">上海XX制造有限公司</div><div class="user-sub">2024 审计年度</div></div>
+    </div>
+  </div>
+  <div class="content-area" style="border-radius:0 12px 12px 0;">
+    <div class="topbar">
+      <div class="breadcrumb">数据录入 / <strong>已实施节能技改项目（上轮）</strong></div>
+      <div class="topbar-right">
+        <div class="topbar-chip">🗓 审计年度：2024</div>
+        <div class="topbar-btn">🔔</div>
+      </div>
+    </div>
+    <div class="main-content">
+      <div class="page-title">已实施节能技改项目（上轮）</div>
+      <div class="page-desc">记录上一轮审计周期内已实施的节能技术改造项目 · 共 6 条记录</div>
+      <div class="table-toolbar">
+        <div class="toolbar-left">
+          <button class="btn-primary">+ 新增项目</button>
+          <button class="btn-default">⬆ 批量导入</button>
+          <button class="btn-default">⬇ 导出 Excel</button>
+        </div>
+        <div class="toolbar-right">
+          <div class="search-wrap">
+            <span class="search-icon">🔍</span>
+            <input class="search-input" placeholder="搜索项目名称...">
+          </div>
+        </div>
+      </div>
+      <div class="data-table">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:40px"><input type="checkbox"></th>
+              <th>项目名称</th>
+              <th>主要内容</th>
+              <th>投资(万元)</th>
+              <th>年节能量(吨标煤)</th>
+              <th>回收期(年)</th>
+              <th>完成时间</th>
+              <th>实际节能量</th>
+              <th>合同能源管理</th>
+              <th style="width:120px">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><input type="checkbox"></td>
+              <td style="color:var(--text);font-weight:500">变频器节能改造</td>
+              <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">对空压机、水泵等设备加装变频器</td>
+              <td>128.5</td><td>320.0</td><td>2.8</td><td>2022-06-15</td><td>298.5</td>
+              <td><span class="status-badge" style="background:#e8f5e9;color:#43a047">✓ 是</span></td>
+              <td><a class="op-link">编辑</a><a class="op-link danger">删除</a></td>
+            </tr>
+            <tr>
+              <td><input type="checkbox"></td>
+              <td style="color:var(--text);font-weight:500">余热回收利用系统</td>
+              <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">回收工业窑炉烟气余热用于预热</td>
+              <td>256.0</td><td>580.0</td><td>3.1</td><td>2022-11-30</td><td>542.0</td>
+              <td><span class="status-badge" style="background:#fdecea;color:#ef5350">✗ 否</span></td>
+              <td><a class="op-link">编辑</a><a class="op-link danger">删除</a></td>
+            </tr>
+            <tr>
+              <td><input type="checkbox"></td>
+              <td style="color:var(--text);font-weight:500">LED照明系统升级</td>
+              <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">厂区全面替换为LED高效照明</td>
+              <td>45.2</td><td>86.0</td><td>3.5</td><td>2023-03-20</td><td>82.3</td>
+              <td><span class="status-badge" style="background:#fdecea;color:#ef5350">✗ 否</span></td>
+              <td><a class="op-link">编辑</a><a class="op-link danger">删除</a></td>
+            </tr>
+            <tr>
+              <td><input type="checkbox"></td>
+              <td style="color:var(--text);font-weight:500">空压机群控改造</td>
+              <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">实施空压机联网群控优化运行</td>
+              <td>78.0</td><td>145.0</td><td>3.8</td><td>2023-07-10</td><td>138.0</td>
+              <td><span class="status-badge" style="background:#e8f5e9;color:#43a047">✓ 是</span></td>
+              <td><a class="op-link">编辑</a><a class="op-link danger">删除</a></td>
+            </tr>
+            <tr>
+              <td><input type="checkbox"></td>
+              <td style="color:var(--text);font-weight:500">建筑围护节能改造</td>
+              <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">加装保温材料降低冷热损耗</td>
+              <td>192.0</td><td>210.0</td><td>6.2</td><td>2023-10-15</td><td>—</td>
+              <td><span class="status-badge" style="background:#fdecea;color:#ef5350">✗ 否</span></td>
+              <td><a class="op-link">编辑</a><a class="op-link danger">删除</a></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="pagination">
+          <div class="page-info">共 6 条记录，每页 10 条</div>
+          <div class="page-btns">
+            <div class="page-btn">‹</div>
+            <div class="page-btn active">1</div>
+            <div class="page-btn">›</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
