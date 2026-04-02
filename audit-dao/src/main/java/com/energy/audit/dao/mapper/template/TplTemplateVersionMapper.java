@@ -22,8 +22,12 @@ public interface TplTemplateVersionMapper {
     /** Latest published version for a template */
     TplTemplateVersion selectPublishedByTemplateId(@Param("templateId") Long templateId);
 
-    /** Return current max version number for a template (null when no versions exist) */
+    /** Return current max version number for a template (null when no versions exist).
+     *  Includes soft-deleted rows so that the unique index is never violated. */
     Integer selectMaxVersion(@Param("templateId") Long templateId);
+
+    /** Version list without the LONGTEXT template_json column — for list views */
+    List<TplTemplateVersion> selectListMetaByTemplateId(@Param("templateId") Long templateId);
 
     int updateById(TplTemplateVersion version);
 

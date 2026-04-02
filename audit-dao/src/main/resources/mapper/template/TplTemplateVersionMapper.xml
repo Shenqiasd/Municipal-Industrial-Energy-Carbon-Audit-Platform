@@ -49,7 +49,19 @@
     <select id="selectMaxVersion" resultType="java.lang.Integer">
         SELECT MAX(version)
         FROM tpl_template_version
+        WHERE template_id = #{templateId}
+    </select>
+
+    <sql id="Meta_Column_List">
+        id, template_id, version, change_log, published, publish_time,
+        create_by, create_time, update_by, update_time, deleted
+    </sql>
+
+    <select id="selectListMetaByTemplateId" resultMap="BaseResultMap">
+        SELECT <include refid="Meta_Column_List"/>
+        FROM tpl_template_version
         WHERE template_id = #{templateId} AND deleted = 0
+        ORDER BY version DESC
     </select>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">

@@ -15,8 +15,11 @@ public interface TemplateVersionService {
     /** Update the SpreadJS JSON content of a draft version */
     void saveJson(Long versionId, String templateJson, String changeLog);
 
-    /** List all versions of a template ordered by version DESC */
+    /** List all versions of a template ordered by version DESC (includes template_json) */
     List<TplTemplateVersion> listVersions(Long templateId);
+
+    /** List versions without the LONGTEXT template_json — for list/table views */
+    List<TplTemplateVersion> listVersionsMeta(Long templateId);
 
     /** Return the latest published version, or null if none */
     TplTemplateVersion getPublished(Long templateId);

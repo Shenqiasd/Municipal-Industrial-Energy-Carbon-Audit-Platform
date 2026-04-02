@@ -23,6 +23,22 @@
         create_by, create_time, update_by, update_time, deleted
     </sql>
 
+    <!--
+        selectByKeyForUpdate: acquires a row-level database lock (SELECT ... FOR UPDATE).
+        Does NOT filter by deleted so we can detect any existing row for the unique key.
+        MUST be called within a @Transactional method.
+    -->
+    <select id="selectByKeyForUpdate" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM tpl_edit_lock
+        WHERE enterprise_id = #{enterpriseId}
+          AND template_id   = #{templateId}
+          AND audit_year    = #{auditYear}
+        LIMIT 1
+        FOR UPDATE
+    </select>
+
+    <!-- selectByKey: reads only active (deleted=0) locks. Used by checkLock and releaseLock. -->
     <select id="selectByKey" resultMap="BaseResultMap">
         SELECT <include refid="Base_Column_List"/>
         FROM tpl_edit_lock
@@ -33,12 +49,8 @@
         LIMIT 1
     </select>
 
-    <!--
-        UPSERT via ON DUPLICATE KEY UPDATE on uk_enterprise_template_year.
-        If a live (deleted=0) row exists for the same key it is updated in-place;
-        a previously soft-deleted row is treated as a new insert (deleted resets to 0).
-    -->
-    <insert id="insertOrUpdate" useGeneratedKeys="true" keyProperty="id">
+    <!-- insert: creates a brand-new lock row when no row exists for this composite key. -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO tpl_edit_lock (
             enterprise_id, template_id, audit_year, lock_user_id,
             lock_time, expire_time,
@@ -48,14 +60,24 @@
             #{lockTime}, #{expireTime},
             #{createBy}, NOW(), #{updateBy}, NOW(), 0
         )
-        ON DUPLICATE KEY UPDATE
-            lock_user_id = VALUES(lock_user_id),
-            lock_time    = VALUES(lock_time),
-            expire_time  = VALUES(expire_time),
-            update_by    = VALUES(update_by),
+    </insert>
+
+    <!--
+        updateByKey: refreshes or re-activates an existing lock row.
+        Resets deleted=0 to handle previously soft-deleted rows.
+    -->
+    <update id="updateByKey">
+        UPDATE tpl_edit_lock
+        SET lock_user_id = #{lockUserId},
+            lock_time    = #{lockTime},
+            expire_time  = #{expireTime},
+            update_by    = #{updateBy},
             update_time  = NOW(),
             deleted      = 0
-    </insert>
+        WHERE enterprise_id = #{enterpriseId}
+          AND template_id   = #{templateId}
+          AND audit_year    = #{auditYear}
+    </update>
 
     <update id="deleteByKey">
         UPDATE tpl_edit_lock

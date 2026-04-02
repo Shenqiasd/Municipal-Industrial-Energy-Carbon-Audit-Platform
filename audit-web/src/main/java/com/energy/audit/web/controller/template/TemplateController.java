@@ -1,8 +1,10 @@
 package com.energy.audit.web.controller.template;
 
+import com.energy.audit.common.exception.BusinessException;
 import com.energy.audit.common.result.PageResult;
 import com.energy.audit.common.result.R;
 import com.energy.audit.common.util.SecurityUtils;
+import com.energy.audit.model.dto.SaveDraftRequest;
 import com.energy.audit.model.entity.template.TplEditLock;
 import com.energy.audit.model.entity.template.TplSubmission;
 import com.energy.audit.model.entity.template.TplTagMapping;
@@ -17,6 +19,7 @@ import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,6 +36,11 @@ import java.util.Map;
 /**
  * Template management controller — covers template CRUD, versioning,
  * tag mapping, enterprise submission, and edit-lock management.
+ *
+ * Role isolation:
+ *   - Admin (userType=1)     : template/version/tag write operations
+ *   - Enterprise (userType=3): submission and edit-lock operations
+ *   - Any authenticated user : template and version read operations
  */
 @Tag(name = "Template", description = "模板管理：CRUD/版本/标签映射/填报/编辑锁")
 @RestController
@@ -58,7 +66,25 @@ public class TemplateController {
     }
 
     // =========================================================================
-    // Template CRUD
+    // Role guards
+    // =========================================================================
+
+    private void requireAdmin() {
+        Integer userType = SecurityUtils.getCurrentUserType();
+        if (userType == null || userType != 1) {
+            throw new BusinessException(403, "该操作仅管理员可执行");
+        }
+    }
+
+    private void requireEnterprise() {
+        Integer userType = SecurityUtils.getCurrentUserType();
+        if (userType == null || userType != 3) {
+            throw new BusinessException(403, "该操作仅企业用户可执行");
+        }
+    }
+
+    // =========================================================================
+    // Template CRUD (read: any authenticated; write: admin only)
     // =========================================================================
 
     @Operation(summary = "分页查询模板列表")
@@ -87,6 +113,7 @@ public class TemplateController {
     @Operation(summary = "新建模板（自动创建 version=1 草稿版本）")
     @PostMapping
     public R<Void> create(@RequestBody TplTemplate template) {
+        requireAdmin();
         templateService.create(template);
         return R.ok();
     }
@@ -94,6 +121,7 @@ public class TemplateController {
     @Operation(summary = "更新模板基本信息")
     @PutMapping("/{id}")
     public R<Void> update(@PathVariable Long id, @RequestBody TplTemplate template) {
+        requireAdmin();
         template.setId(id);
         templateService.update(template);
         return R.ok();
@@ -102,6 +130,7 @@ public class TemplateController {
     @Operation(summary = "删除模板（软删）")
     @DeleteMapping("/{id}")
     public R<Void> delete(@PathVariable Long id) {
+        requireAdmin();
         templateService.delete(id);
         return R.ok();
     }
@@ -109,18 +138,19 @@ public class TemplateController {
     @Operation(summary = "发布模板最新草稿版本（便捷接口）")
     @PostMapping("/{id}/publish")
     public R<Void> publish(@PathVariable Long id) {
+        requireAdmin();
         templateService.publish(id);
         return R.ok();
     }
 
     // =========================================================================
-    // Template Version Management
+    // Template Version Management (read: any; write: admin only)
     // =========================================================================
 
     @Operation(summary = "查询模板版本列表（不含 JSON 内容）")
     @GetMapping("/{templateId}/versions")
     public R<List<TplTemplateVersion>> listVersions(@PathVariable Long templateId) {
-        return R.ok(versionService.listVersions(templateId));
+        return R.ok(versionService.listVersionsMeta(templateId));
     }
 
     @Operation(summary = "获取已发布版本（含 SpreadJS JSON）")
@@ -132,6 +162,7 @@ public class TemplateController {
     @Operation(summary = "为模板创建新草稿版本")
     @PostMapping("/{templateId}/versions")
     public R<TplTemplateVersion> createVersion(@PathVariable Long templateId) {
+        requireAdmin();
         return R.ok(versionService.createDraftVersion(templateId));
     }
 
@@ -139,6 +170,7 @@ public class TemplateController {
     @PutMapping("/versions/{versionId}/json")
     public R<Void> saveVersionJson(@PathVariable Long versionId,
                                    @RequestBody Map<String, String> body) {
+        requireAdmin();
         String json = body.get("templateJson");
         String changeLog = body.get("changeLog");
         versionService.saveJson(versionId, json, changeLog);
@@ -149,17 +181,19 @@ public class TemplateController {
     @PostMapping("/{templateId}/versions/{versionId}/publish")
     public R<Void> publishVersion(@PathVariable Long templateId,
                                   @PathVariable Long versionId) {
+        requireAdmin();
         versionService.publish(templateId, versionId);
         return R.ok();
     }
 
     // =========================================================================
-    // Tag Mapping Management
+    // Tag Mapping Management (admin only)
     // =========================================================================
 
     @Operation(summary = "查询版本的标签映射列表")
     @GetMapping("/versions/{versionId}/tags")
     public R<List<TplTagMapping>> listTags(@PathVariable Long versionId) {
+        requireAdmin();
         return R.ok(tagMappingService.listByVersionId(versionId));
     }
 
@@ -167,18 +201,20 @@ public class TemplateController {
     @PutMapping("/versions/{versionId}/tags")
     public R<Void> replaceTags(@PathVariable Long versionId,
                                @RequestBody List<TplTagMapping> mappings) {
+        requireAdmin();
         tagMappingService.replaceAll(versionId, mappings);
         return R.ok();
     }
 
     // =========================================================================
-    // Enterprise Submission (企业端 — enterpriseId 从安全上下文取，不接受客户端传参)
+    // Enterprise Submission (企业端专属 — enterpriseId 从安全上下文取)
     // =========================================================================
 
     @Operation(summary = "查询当前企业的填报记录（按模板+年度）")
     @GetMapping("/submission")
     public R<TplSubmission> getSubmission(@RequestParam Long templateId,
                                           @RequestParam Integer auditYear) {
+        requireEnterprise();
         Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
         return R.ok(submissionService.getByKey(enterpriseId, templateId, auditYear));
     }
@@ -186,38 +222,39 @@ public class TemplateController {
     @Operation(summary = "查询当前企业所有填报记录")
     @GetMapping("/submissions")
     public R<List<TplSubmission>> listSubmissions() {
+        requireEnterprise();
         Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
         return R.ok(submissionService.listByEnterprise(enterpriseId));
     }
 
     @Operation(summary = "保存或更新草稿填报")
     @PostMapping("/submission/draft")
-    public R<TplSubmission> saveDraft(@RequestBody Map<String, Object> body) {
+    public R<TplSubmission> saveDraft(@RequestBody @Valid SaveDraftRequest req) {
+        requireEnterprise();
         Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
-        Long templateId = Long.parseLong(body.get("templateId").toString());
-        Integer auditYear = Integer.parseInt(body.get("auditYear").toString());
-        String submissionJson = (String) body.get("submissionJson");
-        Integer templateVersion = Integer.parseInt(body.get("templateVersion").toString());
         return R.ok(submissionService.saveDraft(
-                enterpriseId, templateId, auditYear, submissionJson, templateVersion));
+                enterpriseId, req.getTemplateId(), req.getAuditYear(),
+                req.getSubmissionJson(), req.getTemplateVersion()));
     }
 
     @Operation(summary = "提交填报（抽取 Tag 数据存入 extracted_data，status→1）")
     @PostMapping("/submission/{submissionId}/submit")
     public R<Void> submit(@PathVariable Long submissionId,
                           @RequestParam Long templateVersionId) {
+        requireEnterprise();
         submissionService.submit(submissionId, templateVersionId);
         return R.ok();
     }
 
     // =========================================================================
-    // Edit Lock Management
+    // Edit Lock Management (企业端专属)
     // =========================================================================
 
     @Operation(summary = "获取编辑锁（enterpriseId 从安全上下文取）")
     @PostMapping("/lock")
     public R<TplEditLock> acquireLock(@RequestParam Long templateId,
                                       @RequestParam Integer auditYear) {
+        requireEnterprise();
         Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
         return R.ok(editLockService.acquireLock(enterpriseId, templateId, auditYear));
     }
@@ -226,6 +263,7 @@ public class TemplateController {
     @DeleteMapping("/lock")
     public R<Void> releaseLock(@RequestParam Long templateId,
                                @RequestParam Integer auditYear) {
+        requireEnterprise();
         Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
         editLockService.releaseLock(enterpriseId, templateId, auditYear);
         return R.ok();
@@ -235,6 +273,7 @@ public class TemplateController {
     @GetMapping("/lock")
     public R<TplEditLock> checkLock(@RequestParam Long templateId,
                                     @RequestParam Integer auditYear) {
+        requireEnterprise();
         Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
         return R.ok(editLockService.checkLock(enterpriseId, templateId, auditYear));
     }

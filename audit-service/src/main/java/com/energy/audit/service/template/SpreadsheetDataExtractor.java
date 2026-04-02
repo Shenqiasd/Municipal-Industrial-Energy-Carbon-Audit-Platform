@@ -1,5 +1,6 @@
 package com.energy.audit.service.template;
 
+import com.energy.audit.common.exception.BusinessException;
 import com.energy.audit.model.entity.template.TplTagMapping;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -67,7 +68,7 @@ public class SpreadsheetDataExtractor {
             }
         } catch (Exception e) {
             log.error("Failed to extract data from SpreadJS JSON", e);
-            throw new RuntimeException("Failed to extract spreadsheet data", e);
+            throw new BusinessException("解析电子表格数据失败: " + e.getMessage());
         }
         return result;
     }

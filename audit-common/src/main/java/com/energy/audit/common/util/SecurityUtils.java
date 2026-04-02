@@ -41,6 +41,14 @@ public class SecurityUtils {
         return USERNAME.get();
     }
 
+    public static String getRequiredCurrentUsername() {
+        String username = USERNAME.get();
+        if (username == null) {
+            throw new BusinessException(401, "用户未认证");
+        }
+        return username;
+    }
+
     public static Integer getCurrentUserType() {
         return USER_TYPE.get();
     }

@@ -61,6 +61,11 @@ public class TemplateVersionServiceImpl implements TemplateVersionService {
     }
 
     @Override
+    public List<TplTemplateVersion> listVersionsMeta(Long templateId) {
+        return versionMapper.selectListMetaByTemplateId(templateId);
+    }
+
+    @Override
     public TplTemplateVersion getPublished(Long templateId) {
         return versionMapper.selectPublishedByTemplateId(templateId);
     }
@@ -88,6 +93,7 @@ public class TemplateVersionServiceImpl implements TemplateVersionService {
         TplTemplate upd = new TplTemplate();
         upd.setId(templateId);
         upd.setCurrentVersion(v.getVersion());
+        upd.setStatus(1);
         upd.setUpdateBy(operator);
         templateMapper.updateById(upd);
     }

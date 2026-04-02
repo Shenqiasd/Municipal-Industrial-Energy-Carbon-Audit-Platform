@@ -7,12 +7,16 @@ import com.energy.audit.model.entity.template.TplEditLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
 /**
  * Service for managing template edit locks (pessimistic locking).
  * Backed by tpl_edit_lock table — locks survive server restarts.
+ *
+ * Concurrency safety: acquireLock is @Transactional and uses SELECT ... FOR UPDATE
+ * to atomically check and claim the lock row, eliminating the TOCTOU race condition.
  */
 @Service
 public class EditLockService {
@@ -28,35 +32,51 @@ public class EditLockService {
     }
 
     /**
-     * Acquire an edit lock for a template/enterprise/year triple.
-     * If a non-expired lock held by another user exists, throws BusinessException.
-     * If the current user already holds the lock, the expiry is refreshed.
+     * Atomically acquire an edit lock for a template/enterprise/year triple.
+     *
+     * Uses SELECT ... FOR UPDATE inside a transaction to prevent the check-then-write
+     * race condition. Scenarios handled:
+     *   - No row → INSERT new lock
+     *   - Row exists, expired or soft-deleted → UPDATE (reactivate) for current user
+     *   - Row exists, active, same user → UPDATE (refresh expiry)
+     *   - Row exists, active, different user → throw BusinessException 409
      */
+    @Transactional
     public TplEditLock acquireLock(Long enterpriseId, Long templateId, Integer auditYear) {
         Long currentUserId = SecurityUtils.getRequiredCurrentUserId();
-        String operator = SecurityUtils.getCurrentUsername();
+        String operator = SecurityUtils.getRequiredCurrentUsername();
 
-        TplEditLock existing = editLockMapper.selectByKey(enterpriseId, templateId, auditYear);
-        if (existing != null && existing.getExpireTime().isAfter(LocalDateTime.now())) {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime expireTime = now.plusMinutes(LOCK_TIMEOUT_MINUTES);
+
+        TplEditLock existing = editLockMapper.selectByKeyForUpdate(enterpriseId, templateId, auditYear);
+
+        if (existing != null && existing.getDeleted() == 0 && existing.getExpireTime().isAfter(now)) {
             if (!existing.getLockUserId().equals(currentUserId)) {
                 throw new BusinessException("当前文档正在被其他用户编辑中");
             }
+            editLockMapper.updateByKey(enterpriseId, templateId, auditYear,
+                    currentUserId, now, expireTime, operator);
+        } else if (existing != null) {
+            editLockMapper.updateByKey(enterpriseId, templateId, auditYear,
+                    currentUserId, now, expireTime, operator);
+        } else {
+            TplEditLock lock = new TplEditLock();
+            lock.setEnterpriseId(enterpriseId);
+            lock.setTemplateId(templateId);
+            lock.setAuditYear(auditYear);
+            lock.setLockUserId(currentUserId);
+            lock.setLockTime(now);
+            lock.setExpireTime(expireTime);
+            lock.setCreateBy(operator);
+            lock.setUpdateBy(operator);
+            editLockMapper.insert(lock);
         }
 
-        TplEditLock lock = new TplEditLock();
-        lock.setEnterpriseId(enterpriseId);
-        lock.setTemplateId(templateId);
-        lock.setAuditYear(auditYear);
-        lock.setLockUserId(currentUserId);
-        lock.setLockTime(LocalDateTime.now());
-        lock.setExpireTime(LocalDateTime.now().plusMinutes(LOCK_TIMEOUT_MINUTES));
-        lock.setCreateBy(operator);
-        lock.setUpdateBy(operator);
-        editLockMapper.insertOrUpdate(lock);
-
+        TplEditLock result = editLockMapper.selectByKey(enterpriseId, templateId, auditYear);
         log.info("Lock acquired: enterprise={} template={} year={} user={}",
                 enterpriseId, templateId, auditYear, currentUserId);
-        return lock;
+        return result;
     }
 
     /**
@@ -64,7 +84,7 @@ public class EditLockService {
      */
     public void releaseLock(Long enterpriseId, Long templateId, Integer auditYear) {
         Long currentUserId = SecurityUtils.getRequiredCurrentUserId();
-        String operator = SecurityUtils.getCurrentUsername();
+        String operator = SecurityUtils.getRequiredCurrentUsername();
 
         TplEditLock existing = editLockMapper.selectByKey(enterpriseId, templateId, auditYear);
         if (existing != null) {
@@ -84,7 +104,7 @@ public class EditLockService {
         TplEditLock lock = editLockMapper.selectByKey(enterpriseId, templateId, auditYear);
         if (lock != null && lock.getExpireTime().isBefore(LocalDateTime.now())) {
             editLockMapper.deleteByKey(enterpriseId, templateId, auditYear,
-                    SecurityUtils.getCurrentUsername());
+                    SecurityUtils.getRequiredCurrentUsername());
             return null;
         }
         return lock;
