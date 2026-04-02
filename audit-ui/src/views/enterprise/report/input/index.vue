@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRoute } from 'vue-router'
 import {
   getTemplateList,
-  getPublishedVersion,
   acquireLock,
+  checkLock,
   submitSubmission,
   type TplTemplate,
   type TplEditLock,
@@ -44,10 +44,13 @@ async function openTemplate() {
     lockedBy.value = null
   } catch (e: any) {
     const msg: string = e?.response?.data?.message ?? e?.message ?? ''
-    if (msg.includes('其他用户')) {
+    if (msg.includes('其他用户') || msg.includes('locked') || msg.includes('锁定')) {
       isReadonly.value = true
-      lockedBy.value = null
-      ElMessage.warning('该文档已被他人锁定，进入只读模式')
+      try {
+        lockedBy.value = await checkLock(selectedTemplateId.value, selectedYear.value)
+      } catch {
+        lockedBy.value = null
+      }
     } else {
       ElMessage.error('获取编辑锁失败：' + msg)
       lockLoading.value = false
@@ -81,11 +84,15 @@ async function handleSubmit() {
     ElMessage.warning('该年度数据已提交')
     return
   }
-  await ElMessageBox.confirm(
-    `确认提交 ${selectedYear.value} 年度数据？提交后将触发数据抽取并锁定编辑。`,
-    '提交确认',
-    { type: 'warning' }
-  )
+  try {
+    await ElMessageBox.confirm(
+      `确认提交 ${selectedYear.value} 年度数据？提交后将触发数据抽取并锁定编辑。`,
+      '提交确认',
+      { type: 'warning' }
+    )
+  } catch {
+    return
+  }
   submitting.value = true
   try {
     await spreadRef.value.save()
@@ -98,11 +105,8 @@ async function handleSubmit() {
     await submitSubmission(submissionId, versionId)
     ElMessage.success('提交成功，数据已抽取')
     isReadonly.value = true
-    openTemplate()
   } catch (e: any) {
-    if (!String(e).includes('cancel')) {
-      ElMessage.error('提交失败：' + (e?.message ?? '未知错误'))
-    }
+    ElMessage.error('提交失败：' + (e?.message ?? '未知错误'))
   } finally {
     submitting.value = false
   }
@@ -171,10 +175,17 @@ onMounted(async () => {
 
     <template v-if="isActive && selectedTemplateId">
       <el-alert
-        v-if="isReadonly"
+        v-if="isReadonly && lockedBy"
         type="warning"
         :closable="false"
-        title="当前文档处于只读模式（已被其他用户锁定或已提交）"
+        :title="`当前文档正在被「${lockedBy.updateBy ?? '其他用户'}」编辑，已进入只读模式`"
+        show-icon
+      />
+      <el-alert
+        v-else-if="isReadonly"
+        type="warning"
+        :closable="false"
+        title="当前文档处于只读模式（已提交或被他人锁定）"
         show-icon
       />
 
@@ -191,7 +202,7 @@ onMounted(async () => {
       <div class="action-bar" v-if="!isReadonly">
         <el-button
           type="primary"
-          :loading="spreadRef?.saving?.value"
+          :loading="spreadRef?.saving"
           @click="handleSaveDraft"
         >
           保存草稿
