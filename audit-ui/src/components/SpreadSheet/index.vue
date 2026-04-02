@@ -29,12 +29,18 @@ let workbook: import('@/types/spreadjs').GCSpreadWorkbook | null = null
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null
 let publishedVersion: TplTemplateVersion | null = null
 let currentSubmission: TplSubmission | null = null
-let editingMode = false
+
+/**
+ * Tracks whether this component instance holds an active edit lock.
+ * Set to true only when parent passed readonly=false AND initWorkbook
+ * enters editing mode. Cleared whenever the lock is released.
+ */
+let ownsLock = false
 
 watch(
   () => props.readonly,
   (isNowReadonly) => {
-    if (isNowReadonly && editingMode) {
+    if (isNowReadonly && ownsLock) {
       enterReadonly()
     }
   }
@@ -46,8 +52,9 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   stopHeartbeat()
-  if (editingMode) {
+  if (ownsLock) {
     releaseLock(props.templateId, props.auditYear).catch(() => {})
+    ownsLock = false
   }
   workbook?.destroy()
   workbook = null
@@ -69,6 +76,7 @@ async function initWorkbook() {
       errorMsg.value = '该模板尚未发布有效版本，请联系管理员'
       workbook.destroy()
       workbook = null
+      releaseLockIfOwned()
       return
     }
 
@@ -77,26 +85,33 @@ async function initWorkbook() {
     const jsonStr = currentSubmission?.submissionJson ?? publishedVersion.templateJson
     workbook.fromJSON(JSON.parse(jsonStr))
 
-    const shouldBeReadonly = props.readonly || currentSubmission?.status === 1
-    if (shouldBeReadonly) {
+    const forceReadonly = props.readonly || currentSubmission?.status === 1
+    if (forceReadonly) {
       applyReadonlyProtection()
-      editingMode = false
+      releaseLockIfOwned()
     } else {
+      ownsLock = true
       startHeartbeat()
-      editingMode = true
     }
   } catch (e: any) {
     errorMsg.value = '加载模板失败：' + (e?.message ?? '未知错误')
+    releaseLockIfOwned()
   } finally {
     loading.value = false
   }
 }
 
+function releaseLockIfOwned() {
+  if (ownsLock) {
+    releaseLock(props.templateId, props.auditYear).catch(() => {})
+    ownsLock = false
+  }
+}
+
 function enterReadonly() {
   stopHeartbeat()
-  releaseLock(props.templateId, props.auditYear).catch(() => {})
+  releaseLockIfOwned()
   applyReadonlyProtection()
-  editingMode = false
 }
 
 function applyReadonlyProtection() {
