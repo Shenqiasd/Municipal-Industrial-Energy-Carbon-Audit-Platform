@@ -24,6 +24,10 @@ public interface TplTagMappingMapper {
     int deleteByVersionId(@Param("templateVersionId") Long templateVersionId,
                           @Param("updateBy") String updateBy);
 
+    /** Find a single active mapping by version + tagName */
+    TplTagMapping selectByVersionIdAndTagName(@Param("templateVersionId") Long templateVersionId,
+                                              @Param("tagName") String tagName);
+
     /** Soft-delete a single mapping by id */
     int softDeleteById(@Param("id") Long id, @Param("updateBy") String updateBy);
 

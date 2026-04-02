@@ -55,9 +55,6 @@ public class TagMappingServiceImpl implements TagMappingService {
         String operator = SecurityUtils.getRequiredCurrentUsername();
         Set<String> discoveredTags = extractor.discoverTagNames(templateJson);
 
-        // Load all existing active mappings in one query and index by tagName.
-        // Use merge function to handle any duplicate tagName rows defensively;
-        // in practice the unique-active-tag invariant should be maintained by the schema.
         Map<String, TplTagMapping> existingByTag = tagMappingMapper
                 .selectListByVersionId(versionId)
                 .stream()
@@ -65,31 +62,26 @@ public class TagMappingServiceImpl implements TagMappingService {
                         TplTagMapping::getTagName,
                         m -> m,
                         (first, dup) -> {
-                            log.warn("syncFromTemplateJson: duplicate active tag '{}' for versionId={}, keeping first",
-                                    first.getTagName(), versionId);
+                            log.warn("syncFromTemplateJson: duplicate active tag '{}' for versionId={}", first.getTagName(), versionId);
                             return first;
                         }
                 ));
 
-        // Insert tags discovered in JSON but absent from DB
         for (String tagName : discoveredTags) {
             if (!existingByTag.containsKey(tagName)) {
-                TplTagMapping newMapping = new TplTagMapping();
-                newMapping.setTemplateVersionId(versionId);
-                newMapping.setTagName(tagName);
-                // Default fieldName = tagName to satisfy NOT NULL constraint;
-                // admin reconfigures the actual field name via the tag-config panel.
-                newMapping.setFieldName(tagName);
-                newMapping.setDataType("STRING");
-                newMapping.setRequired(0);
-                newMapping.setSheetIndex(0);
-                newMapping.setCreateBy(operator);
-                newMapping.setUpdateBy(operator);
-                tagMappingMapper.insert(newMapping);
+                TplTagMapping m = new TplTagMapping();
+                m.setTemplateVersionId(versionId);
+                m.setTagName(tagName);
+                m.setFieldName(tagName);
+                m.setDataType("STRING");
+                m.setRequired(0);
+                m.setSheetIndex(0);
+                m.setCreateBy(operator);
+                m.setUpdateBy(operator);
+                tagMappingMapper.insert(m);
             }
         }
 
-        // Soft-delete tags that are no longer present in the JSON
         existingByTag.forEach((tagName, mapping) -> {
             if (!discoveredTags.contains(tagName)) {
                 tagMappingMapper.softDeleteById(mapping.getId(), operator);
