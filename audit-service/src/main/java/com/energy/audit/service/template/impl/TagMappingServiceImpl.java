@@ -9,7 +9,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class TagMappingServiceImpl implements TagMappingService {
@@ -49,16 +51,21 @@ public class TagMappingServiceImpl implements TagMappingService {
         String operator = SecurityUtils.getRequiredCurrentUsername();
         Set<String> discoveredTags = extractor.discoverTagNames(templateJson);
 
-        List<TplTagMapping> existing = tagMappingMapper.selectListByVersionId(versionId);
+        // Load all existing active mappings in one query and index by tagName
+        // to avoid N+1 per-tag lookups.
+        Map<String, TplTagMapping> existingByTag = tagMappingMapper
+                .selectListByVersionId(versionId)
+                .stream()
+                .collect(Collectors.toMap(TplTagMapping::getTagName, m -> m));
 
+        // Insert tags discovered in JSON but absent from DB
         for (String tagName : discoveredTags) {
-            TplTagMapping found = tagMappingMapper.selectByVersionIdAndTagName(versionId, tagName);
-            if (found == null) {
+            if (!existingByTag.containsKey(tagName)) {
                 TplTagMapping newMapping = new TplTagMapping();
                 newMapping.setTemplateVersionId(versionId);
                 newMapping.setTagName(tagName);
-                // Use tagName as default fieldName to satisfy NOT NULL constraint;
-                // admin can reconfigure via the tag-config panel.
+                // Default fieldName = tagName to satisfy NOT NULL constraint;
+                // admin reconfigures the actual field name via the tag-config panel.
                 newMapping.setFieldName(tagName);
                 newMapping.setDataType("STRING");
                 newMapping.setRequired(0);
@@ -69,10 +76,11 @@ public class TagMappingServiceImpl implements TagMappingService {
             }
         }
 
-        for (TplTagMapping m : existing) {
-            if (!discoveredTags.contains(m.getTagName())) {
-                tagMappingMapper.softDeleteById(m.getId(), operator);
+        // Soft-delete tags that are no longer present in the JSON
+        existingByTag.forEach((tagName, mapping) -> {
+            if (!discoveredTags.contains(tagName)) {
+                tagMappingMapper.softDeleteById(mapping.getId(), operator);
             }
-        }
+        });
     }
 }
