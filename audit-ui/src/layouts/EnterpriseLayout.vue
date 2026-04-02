@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { enterpriseMenus } from '@/config/menus'
+import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+
+const showChangePwd = ref(false)
 
 const enterpriseName = computed(() => userStore.userInfo?.enterpriseName || '企业用户')
 const auditYear = computed(() => userStore.userInfo?.auditYear || new Date().getFullYear())
@@ -27,6 +30,12 @@ function logout() {
   userStore.logout()
   router.push('/login')
 }
+
+onMounted(() => {
+  if (userStore.needChangePassword) {
+    showChangePwd.value = true
+  }
+})
 </script>
 
 <template>
@@ -83,6 +92,8 @@ function logout() {
         <router-view />
       </main>
     </div>
+
+    <ChangePasswordDialog v-model="showChangePwd" />
   </div>
 </template>
 
