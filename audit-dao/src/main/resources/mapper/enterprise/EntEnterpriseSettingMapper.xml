@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.energy.audit.dao.mapper.enterprise.EntEnterpriseSettingMapper">
+
+    <resultMap id="BaseResultMap" type="com.energy.audit.model.entity.enterprise.EntEnterpriseSetting">
+        <id     column="id"                      property="id"/>
+        <result column="enterprise_id"           property="enterpriseId"/>
+        <result column="enterprise_address"      property="enterpriseAddress"/>
+        <result column="unit_address"            property="unitAddress"/>
+        <result column="postal_code"             property="postalCode"/>
+        <result column="fax"                     property="fax"/>
+        <result column="legal_representative"    property="legalRepresentative"/>
+        <result column="legal_phone"             property="legalPhone"/>
+        <result column="enterprise_contact"      property="enterpriseContact"/>
+        <result column="enterprise_mobile"       property="enterpriseMobile"/>
+        <result column="enterprise_email"        property="enterpriseEmail"/>
+        <result column="compiler_contact"         property="compilerContact"/>
+        <result column="compiler_name"           property="compilerName"/>
+        <result column="compiler_mobile"         property="compilerMobile"/>
+        <result column="compiler_email"          property="compilerEmail"/>
+        <result column="energy_cert"             property="energyCert"/>
+        <result column="cert_authority"          property="certAuthority"/>
+        <result column="cert_pass_date"          property="certPassDate"/>
+        <result column="registered_capital"      property="registeredCapital"/>
+        <result column="registered_date"         property="registeredDate"/>
+        <result column="industry_category"       property="industryCategory"/>
+        <result column="industry_code"           property="industryCode"/>
+        <result column="industry_name"           property="industryName"/>
+        <result column="superior_department"     property="superiorDepartment"/>
+        <result column="unit_nature"             property="unitNature"/>
+        <result column="energy_enterprise_type"  property="energyEnterpriseType"/>
+        <result column="remark"                  property="remark"/>
+        <result column="create_by"               property="createBy"/>
+        <result column="create_time"             property="createTime"/>
+        <result column="update_by"               property="updateBy"/>
+        <result column="update_time"             property="updateTime"/>
+        <result column="deleted"                 property="deleted"/>
+    </resultMap>
+
+    <select id="selectByEnterpriseId" resultMap="BaseResultMap">
+        SELECT *
+        FROM ent_enterprise_setting
+        WHERE enterprise_id = #{enterpriseId} AND deleted = 0
+        LIMIT 1
+    </select>
+
+    <!-- MySQL INSERT ... ON DUPLICATE KEY UPDATE (unique key on enterprise_id) -->
+    <insert id="upsert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ent_enterprise_setting (
+            enterprise_id, enterprise_address, unit_address, postal_code, fax,
+            legal_representative, legal_phone, enterprise_contact, enterprise_mobile, enterprise_email,
+            compiler_contact, compiler_name, compiler_mobile, compiler_email,
+            energy_cert, cert_authority, cert_pass_date,
+            registered_capital, registered_date,
+            industry_category, industry_code, industry_name,
+            superior_department, unit_nature, energy_enterprise_type,
+            remark, create_by, create_time, update_by, update_time, deleted
+        ) VALUES (
+            #{enterpriseId}, #{enterpriseAddress}, #{unitAddress}, #{postalCode}, #{fax},
+            #{legalRepresentative}, #{legalPhone}, #{enterpriseContact}, #{enterpriseMobile}, #{enterpriseEmail},
+            #{compilerContact}, #{compilerName}, #{compilerMobile}, #{compilerEmail},
+            #{energyCert}, #{certAuthority}, #{certPassDate},
+            #{registeredCapital}, #{registeredDate},
+            #{industryCategory}, #{industryCode}, #{industryName},
+            #{superiorDepartment}, #{unitNature}, #{energyEnterpriseType},
+            #{remark}, #{createBy}, NOW(), #{updateBy}, NOW(), 0
+        )
+        ON DUPLICATE KEY UPDATE
+            enterprise_address     = VALUES(enterprise_address),
+            unit_address           = VALUES(unit_address),
+            postal_code            = VALUES(postal_code),
+            fax                    = VALUES(fax),
+            legal_representative   = VALUES(legal_representative),
+            legal_phone            = VALUES(legal_phone),
+            enterprise_contact     = VALUES(enterprise_contact),
+            enterprise_mobile      = VALUES(enterprise_mobile),
+            enterprise_email       = VALUES(enterprise_email),
+            compiler_contact       = VALUES(compiler_contact),
+            compiler_name          = VALUES(compiler_name),
+            compiler_mobile        = VALUES(compiler_mobile),
+            compiler_email         = VALUES(compiler_email),
+            energy_cert            = VALUES(energy_cert),
+            cert_authority         = VALUES(cert_authority),
+            cert_pass_date         = VALUES(cert_pass_date),
+            registered_capital     = VALUES(registered_capital),
+            registered_date        = VALUES(registered_date),
+            industry_category      = VALUES(industry_category),
+            industry_code          = VALUES(industry_code),
+            industry_name          = VALUES(industry_name),
+            superior_department    = VALUES(superior_department),
+            unit_nature            = VALUES(unit_nature),
+            energy_enterprise_type = VALUES(energy_enterprise_type),
+            remark                 = VALUES(remark),
+            update_by              = VALUES(update_by),
+            update_time            = NOW()
+    </insert>
+
+</mapper>

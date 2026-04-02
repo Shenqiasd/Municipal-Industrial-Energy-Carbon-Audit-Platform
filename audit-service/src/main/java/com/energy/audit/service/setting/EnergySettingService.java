@@ -18,4 +18,10 @@ public interface EnergySettingService {
     void update(BsEnergy energy);
 
     void delete(Long id);
+
+    /**
+     * Import energy entries from global catalog into the current enterprise's energy list.
+     * @param catalogIds IDs from bs_energy_catalog to import
+     */
+    void importFromCatalog(List<Long> catalogIds);
 }

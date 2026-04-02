@@ -208,7 +208,101 @@ CREATE TABLE IF NOT EXISTS sys_dict_data (
     PRIMARY KEY (id)
 );
 
--- 12. sys_operation_log  (matches SysOperationLogMapper.xml + production sys_operation_log)
+-- 12. ent_enterprise_setting  (matches EntEnterpriseSettingMapper.xml + production ent_enterprise_setting)
+CREATE TABLE IF NOT EXISTS ent_enterprise_setting (
+    id                     BIGINT        NOT NULL AUTO_INCREMENT,
+    enterprise_id          BIGINT        NOT NULL,
+    enterprise_address     VARCHAR(512),
+    unit_address           VARCHAR(512),
+    postal_code            VARCHAR(10),
+    fax                    VARCHAR(32),
+    legal_representative   VARCHAR(64),
+    legal_phone            VARCHAR(20),
+    enterprise_contact     VARCHAR(64),
+    enterprise_mobile      VARCHAR(20),
+    enterprise_email       VARCHAR(128),
+    compiler_contact       VARCHAR(64),
+    compiler_name          VARCHAR(256),
+    compiler_mobile        VARCHAR(20),
+    compiler_email         VARCHAR(128),
+    energy_cert            TINYINT       DEFAULT 0,
+    cert_authority         VARCHAR(256),
+    cert_pass_date         DATE,
+    registered_capital     DECIMAL(18,2),
+    registered_date        DATE,
+    industry_category      VARCHAR(64),
+    industry_code          VARCHAR(32),
+    industry_name          VARCHAR(128),
+    superior_department    VARCHAR(256),
+    unit_nature            VARCHAR(64),
+    energy_enterprise_type VARCHAR(64),
+    remark                 VARCHAR(512),
+    create_by              VARCHAR(64),
+    create_time            DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_by              VARCHAR(64),
+    update_time            DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted                TINYINT       NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_enterprise_id (enterprise_id)
+);
+
+-- 13. bs_energy_catalog  (matches BsEnergyCatalogMapper.xml — global admin-managed energy reference)
+CREATE TABLE IF NOT EXISTS bs_energy_catalog (
+    id               BIGINT         NOT NULL AUTO_INCREMENT,
+    name             VARCHAR(128)   NOT NULL,
+    category         VARCHAR(64),
+    measurement_unit VARCHAR(32),
+    equivalent_value DECIMAL(18,6),
+    equal_value      DECIMAL(18,6),
+    low_heat_value   DECIMAL(18,6),
+    carbon_content   DECIMAL(18,6),
+    oxidation_rate   DECIMAL(18,6),
+    color            VARCHAR(16),
+    is_active        TINYINT        DEFAULT 1,
+    sort_order       INT            DEFAULT 0,
+    remark           VARCHAR(512),
+    create_by        VARCHAR(64),
+    create_time      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_by        VARCHAR(64),
+    update_time      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted          TINYINT        NOT NULL DEFAULT 0,
+    PRIMARY KEY (id)
+);
+
+-- 14. cm_emission_factor  (matches CmEmissionFactorMapper.xml + production cm_emission_factor)
+CREATE TABLE IF NOT EXISTS cm_emission_factor (
+    id               BIGINT         NOT NULL AUTO_INCREMENT,
+    factor_name      VARCHAR(128)   NOT NULL,
+    energy_type      VARCHAR(64),
+    factor_value     DECIMAL(18,8),
+    measurement_unit VARCHAR(32),
+    source           VARCHAR(256),
+    effective_year   INT,
+    status           TINYINT        DEFAULT 1,
+    remark           VARCHAR(512),
+    create_by        VARCHAR(64),
+    create_time      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_by        VARCHAR(64),
+    update_time      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted          TINYINT        NOT NULL DEFAULT 0,
+    PRIMARY KEY (id)
+);
+
+-- 15. bs_unit_energy  (matches BsUnitEnergyMapper.xml + production bs_unit_energy)
+CREATE TABLE IF NOT EXISTS bs_unit_energy (
+    id          BIGINT      NOT NULL AUTO_INCREMENT,
+    unit_id     BIGINT      NOT NULL,
+    energy_id   BIGINT      NOT NULL,
+    create_by   VARCHAR(64),
+    create_time DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_by   VARCHAR(64),
+    update_time DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted     TINYINT     NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_unit_energy (unit_id, energy_id)
+);
+
+-- 16. sys_operation_log  (matches SysOperationLogMapper.xml + production sys_operation_log)
 CREATE TABLE IF NOT EXISTS sys_operation_log (
     id               BIGINT       NOT NULL AUTO_INCREMENT,
     user_id          BIGINT,

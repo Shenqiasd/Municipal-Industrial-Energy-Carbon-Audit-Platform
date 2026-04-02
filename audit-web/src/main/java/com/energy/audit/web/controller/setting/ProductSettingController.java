@@ -1,7 +1,11 @@
 package com.energy.audit.web.controller.setting;
 
+import com.energy.audit.common.result.PageResult;
 import com.energy.audit.common.result.R;
 import com.energy.audit.model.entity.setting.BsProduct;
+import com.energy.audit.service.setting.ProductSettingService;
+import com.github.pagehelper.PageHelper;
+import com.github.pagehelper.PageInfo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -19,44 +23,53 @@ import java.util.List;
 /**
  * Product setting controller
  */
-@Tag(name = "Product Settings", description = "Product CRUD operations")
+@Tag(name = "Product Settings", description = "Enterprise product CRUD")
 @RestController
 @RequestMapping("/setting/product")
 public class ProductSettingController {
 
+    private final ProductSettingService productSettingService;
+
+    public ProductSettingController(ProductSettingService productSettingService) {
+        this.productSettingService = productSettingService;
+    }
+
     @Operation(summary = "Get product by ID")
     @GetMapping("/{id}")
     public R<BsProduct> getById(@PathVariable Long id) {
-        // TODO: inject and use ProductSettingService
-        return R.ok();
+        return R.ok(productSettingService.getById(id));
     }
 
     @Operation(summary = "List products with pagination")
     @GetMapping
-    public R<List<BsProduct>> list(@RequestParam(defaultValue = "1") Integer pageNum,
-                                   @RequestParam(defaultValue = "10") Integer pageSize) {
-        // TODO: inject and use ProductSettingService
-        return R.ok();
+    public R<PageResult<BsProduct>> list(BsProduct query,
+                                          @RequestParam(defaultValue = "1") Integer pageNum,
+                                          @RequestParam(defaultValue = "10") Integer pageSize) {
+        PageHelper.startPage(pageNum, pageSize);
+        List<BsProduct> list = productSettingService.list(query);
+        PageInfo<BsProduct> pageInfo = new PageInfo<>(list);
+        return R.ok(PageResult.of(pageInfo.getTotal(), pageInfo.getList()));
     }
 
     @Operation(summary = "Create product")
     @PostMapping
     public R<Void> create(@RequestBody BsProduct product) {
-        // TODO: inject and use ProductSettingService
+        productSettingService.create(product);
         return R.ok();
     }
 
     @Operation(summary = "Update product")
     @PutMapping("/{id}")
     public R<Void> update(@PathVariable Long id, @RequestBody BsProduct product) {
-        // TODO: inject and use ProductSettingService
+        product.setId(id);
+        productSettingService.update(product);
         return R.ok();
     }
 
     @Operation(summary = "Delete product")
     @DeleteMapping("/{id}")
     public R<Void> delete(@PathVariable Long id) {
-        // TODO: inject and use ProductSettingService
+        productSettingService.delete(id);
         return R.ok();
     }
 }
