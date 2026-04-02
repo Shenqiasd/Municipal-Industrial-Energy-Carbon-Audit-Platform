@@ -7,7 +7,7 @@
         <id     column="id"               property="id"/>
         <result column="template_code"    property="templateCode"/>
         <result column="template_name"    property="templateName"/>
-        <result column="category"         property="category"/>
+        <result column="module_type"      property="moduleType"/>
         <result column="description"      property="description"/>
         <result column="current_version"  property="currentVersion"/>
         <result column="status"           property="status"/>
@@ -20,7 +20,7 @@
     </resultMap>
 
     <sql id="Base_Column_List">
-        id, template_code, template_name, category, description, current_version, status, remark,
+        id, template_code, template_name, module_type, description, current_version, status, remark,
         create_by, create_time, update_by, update_time, deleted
     </sql>
 
@@ -43,8 +43,8 @@
         <if test="templateName != null and templateName != ''">
             AND template_name LIKE CONCAT('%', #{templateName}, '%')
         </if>
-        <if test="category != null and category != ''">
-            AND category = #{category}
+        <if test="moduleType != null and moduleType != ''">
+            AND module_type = #{moduleType}
         </if>
         <if test="status != null">
             AND status = #{status}
@@ -54,10 +54,10 @@
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO tpl_template (
-            template_code, template_name, category, description, current_version, status, remark,
+            template_code, template_name, module_type, description, current_version, status, remark,
             create_by, create_time, update_by, update_time, deleted
         ) VALUES (
-            #{templateCode}, #{templateName}, #{category}, #{description}, #{currentVersion}, #{status}, #{remark},
+            #{templateCode}, #{templateName}, #{moduleType}, #{description}, #{currentVersion}, #{status}, #{remark},
             #{createBy}, NOW(), #{updateBy}, NOW(), 0
         )
     </insert>
@@ -68,7 +68,7 @@
             update_time = NOW(),
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="templateName != null">template_name = #{templateName},</if>
-            <if test="category != null">category = #{category},</if>
+            <if test="moduleType != null">module_type = #{moduleType},</if>
             <if test="description != null">description = #{description},</if>
             <if test="currentVersion != null">current_version = #{currentVersion},</if>
             <if test="status != null">status = #{status},</if>
@@ -79,7 +79,7 @@
 
     <update id="deleteById">
         UPDATE tpl_template
-        SET deleted = 1, update_time = NOW()
+        SET deleted = 1, update_by = #{updateBy}, update_time = NOW()
         WHERE id = #{id}
     </update>
 

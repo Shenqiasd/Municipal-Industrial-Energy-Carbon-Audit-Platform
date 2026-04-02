@@ -4,25 +4,30 @@
 <mapper namespace="com.energy.audit.dao.mapper.setting.BsEnergyMapper">
 
     <resultMap id="BaseResultMap" type="com.energy.audit.model.entity.setting.BsEnergy">
-        <id     column="id"                property="id"/>
-        <result column="energy_code"       property="energyCode"/>
-        <result column="energy_name"       property="energyName"/>
-        <result column="category"          property="category"/>
-        <result column="unit"              property="unit"/>
-        <result column="conversion_factor" property="conversionFactor"/>
-        <result column="carbon_factor"     property="carbonFactor"/>
-        <result column="order_num"         property="orderNum"/>
-        <result column="status"            property="status"/>
-        <result column="create_by"         property="createBy"/>
-        <result column="create_time"       property="createTime"/>
-        <result column="update_by"         property="updateBy"/>
-        <result column="update_time"       property="updateTime"/>
-        <result column="deleted"           property="deleted"/>
+        <id     column="id"               property="id"/>
+        <result column="enterprise_id"    property="enterpriseId"/>
+        <result column="name"             property="name"/>
+        <result column="category"         property="category"/>
+        <result column="measurement_unit" property="measurementUnit"/>
+        <result column="equivalent_value" property="equivalentValue"/>
+        <result column="equal_value"      property="equalValue"/>
+        <result column="low_heat_value"   property="lowHeatValue"/>
+        <result column="carbon_content"   property="carbonContent"/>
+        <result column="oxidation_rate"   property="oxidationRate"/>
+        <result column="color"            property="color"/>
+        <result column="is_active"        property="isActive"/>
+        <result column="remark"           property="remark"/>
+        <result column="create_by"        property="createBy"/>
+        <result column="create_time"      property="createTime"/>
+        <result column="update_by"        property="updateBy"/>
+        <result column="update_time"      property="updateTime"/>
+        <result column="deleted"          property="deleted"/>
     </resultMap>
 
     <sql id="Base_Column_List">
-        id, energy_code, energy_name, category, unit, conversion_factor, carbon_factor,
-        order_num, status, create_by, create_time, update_by, update_time, deleted
+        id, enterprise_id, name, category, measurement_unit, equivalent_value, equal_value,
+        low_heat_value, carbon_content, oxidation_rate, color, is_active, remark,
+        create_by, create_time, update_by, update_time, deleted
     </sql>
 
     <select id="selectById" resultMap="BaseResultMap">
@@ -35,25 +40,30 @@
         SELECT <include refid="Base_Column_List"/>
         FROM bs_energy
         WHERE deleted = 0
-        <if test="energyName != null and energyName != ''">
-            AND energy_name LIKE CONCAT('%', #{energyName}, '%')
+        <if test="enterpriseId != null">
+            AND enterprise_id = #{enterpriseId}
+        </if>
+        <if test="name != null and name != ''">
+            AND name LIKE CONCAT('%', #{name}, '%')
         </if>
         <if test="category != null and category != ''">
             AND category = #{category}
         </if>
-        <if test="status != null">
-            AND status = #{status}
+        <if test="isActive != null">
+            AND is_active = #{isActive}
         </if>
-        ORDER BY category, order_num
+        ORDER BY category, id
     </select>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO bs_energy (
-            energy_code, energy_name, category, unit, conversion_factor, carbon_factor,
-            order_num, status, create_by, create_time, update_by, update_time, deleted
+            enterprise_id, name, category, measurement_unit, equivalent_value, equal_value,
+            low_heat_value, carbon_content, oxidation_rate, color, is_active, remark,
+            create_by, create_time, update_by, update_time, deleted
         ) VALUES (
-            #{energyCode}, #{energyName}, #{category}, #{unit}, #{conversionFactor}, #{carbonFactor},
-            #{orderNum}, #{status}, #{createBy}, NOW(), #{updateBy}, NOW(), 0
+            #{enterpriseId}, #{name}, #{category}, #{measurementUnit}, #{equivalentValue}, #{equalValue},
+            #{lowHeatValue}, #{carbonContent}, #{oxidationRate}, #{color}, #{isActive}, #{remark},
+            #{createBy}, NOW(), #{updateBy}, NOW(), 0
         )
     </insert>
 
@@ -62,20 +72,24 @@
         <set>
             update_time = NOW(),
             <if test="updateBy != null">update_by = #{updateBy},</if>
-            <if test="energyName != null">energy_name = #{energyName},</if>
+            <if test="name != null">name = #{name},</if>
             <if test="category != null">category = #{category},</if>
-            <if test="unit != null">unit = #{unit},</if>
-            <if test="conversionFactor != null">conversion_factor = #{conversionFactor},</if>
-            <if test="carbonFactor != null">carbon_factor = #{carbonFactor},</if>
-            <if test="orderNum != null">order_num = #{orderNum},</if>
-            <if test="status != null">status = #{status},</if>
+            <if test="measurementUnit != null">measurement_unit = #{measurementUnit},</if>
+            <if test="equivalentValue != null">equivalent_value = #{equivalentValue},</if>
+            <if test="equalValue != null">equal_value = #{equalValue},</if>
+            <if test="lowHeatValue != null">low_heat_value = #{lowHeatValue},</if>
+            <if test="carbonContent != null">carbon_content = #{carbonContent},</if>
+            <if test="oxidationRate != null">oxidation_rate = #{oxidationRate},</if>
+            <if test="color != null">color = #{color},</if>
+            <if test="isActive != null">is_active = #{isActive},</if>
+            <if test="remark != null">remark = #{remark},</if>
         </set>
         WHERE id = #{id} AND deleted = 0
     </update>
 
     <update id="deleteById">
         UPDATE bs_energy
-        SET deleted = 1, update_time = NOW()
+        SET deleted = 1, update_by = #{updateBy}, update_time = NOW()
         WHERE id = #{id}
     </update>
 

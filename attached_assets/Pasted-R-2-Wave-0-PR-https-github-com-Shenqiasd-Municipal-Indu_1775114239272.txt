@@ -1,0 +1,148 @@
+R #2 审核报告: Wave 0 基础设施与认证模块完整实现
+PR: https://github.com/Shenqiasd/Municipal-Industrial-Energy-Carbon-Audit-Platform/pull/2 分支: feat/wave0-complete -> master 变更: 18 files, +4104 -13 (vs master, 含PR#1合并后的增量)
+
+变更范围总结
+类别	内容
+Mapper XML (6个)	EntEnterprise、BsEnergy、BsProduct、BsUnit、SysRole、TplTemplate
+H2 开发环境	schema-h2.sql (8表)、data-h2.sql (seed数据)、application-dev.yml (H2配置)
+依赖	H2 + MySQL driver 加入 audit-web/pom.xml
+前端	package.json 排序、vite.config.ts 开发服务器配置、auto-import 生成文件
+Replit 配置	.replit + replit.md
+其他	AuditorLayout.vue 空行格式化
+严重问题 (Critical)
+#1. H2 dev schema 与生产 MySQL schema 存在严重的列名/结构不匹配
+严重性: Critical - 会导致 dev 环境测试通过但生产环境运行失败
+
+schema-h2.sql 声明 "Columns and names MUST match the MyBatis mapper XMLs exactly"，但 Mapper XML 中引用的列名/结构与生产 sql/00-schema.sql 严重偏离。这意味着 Mapper XML 在 H2 上可以运行，但切换到生产 MySQL 时会因列名不存在而全部报错。
+
+1a. ent_enterprise — 列名完全不同
+H2 dev schema / Mapper XML	生产 MySQL schema	问题
+name	enterprise_name	列名不同
+industry_type	不存在	生产表无此列
+province	不存在	生产表无此列
+city	不存在	生产表无此列
+district	不存在	生产表无此列
+address	不存在	生产表无此列
+status	is_active	语义相同但列名不同
+不存在	expire_date	生产有、dev无
+不存在	is_locked	生产有、dev无
+不存在	last_login_time	生产有、dev无
+不存在	sort_order	生产有、dev无
+影响: EntEnterpriseMapper.xml 中的所有 SQL 在生产 MySQL 上都会报 Unknown column 错误。
+
+1b. bs_energy — 列名/结构完全不同
+H2 dev / Mapper XML	生产 MySQL	问题
+energy_code	不存在	生产表无此列
+energy_name	name	列名不同
+unit	measurement_unit	列名不同
+conversion_factor	equivalent_value / equal_value	语义不同，生产有两个转换因子
+carbon_factor	carbon_content + oxidation_rate	生产拆分为两个字段
+order_num	不存在	生产无排序字段
+status	is_active	列名不同
+不存在	enterprise_id (NOT NULL)	生产必填但 dev 无此列
+不存在	low_heat_value	生产有、dev无
+不存在	color	生产有、dev无
+1c. bs_product — 列名/结构完全不同
+H2 dev / Mapper XML	生产 MySQL	问题
+product_code	不存在	生产表无此列
+product_name	name	列名不同
+category	不存在	生产表无此列
+unit	measurement_unit	列名不同
+order_num	不存在	生产无排序字段
+status	不存在	生产无状态字段
+不存在	enterprise_id (NOT NULL)	生产必填但 dev 无此列
+不存在	unit_price	生产有、dev无
+1d. bs_unit — 完全是不同的数据模型
+H2 dev / Mapper XML	生产 MySQL	问题
+unit_code	不存在	生产是"工艺单元"，不是"计量单位"
+unit_name	name	语义完全不同
+symbol	不存在	计量单位符号，生产无
+conversion_factor	不存在	单位转换因子，生产无
+order_num	不存在	生产无
+status	不存在	生产无
+不存在	enterprise_id (NOT NULL)	生产必填
+不存在	unit_type (NOT NULL)	生产必填
+不存在	sub_category	生产有
+根本问题: 生产中的 bs_unit 是"工艺单元"（加工转换/分配输送/终端使用），而 Mapper XML + H2 schema 将其建模为"计量单位"（kg, m, L 等）。这是数据模型层面的理解错误。
+
+1e. sys_role — 排序列名不匹配
+H2 dev / Mapper XML	生产 MySQL	问题
+order_num	sort_order	列名不同
+1f. tpl_template — 类型不匹配 + 缺少列
+H2 dev / Mapper XML	生产 MySQL	问题
+current_version VARCHAR(32)	current_version INT DEFAULT 1	类型不匹配 (Devin Review 已指出)
+category	module_type	列名不同
+总结: 6个新 Mapper XML 中有 5 个无法在生产 MySQL 上正常工作。只有 SysUserMapper.xml（PR #1 中已存在）是正确的。
+
+中等问题 (Medium)
+#2. data-h2.sql BCrypt hash 使用 $2b$ 前缀，Java BCrypt 库可能不兼容
+
+'$2b$10$0T0mZTyDLfErwhn/qSjIG.MlhJOt9BdDpKQ58iXLRMNlwqI2pmbpK'
+Spring Security 的 BCryptPasswordEncoder 使用 $2a$ 前缀。$2b$ 是某些非 Java 工具（如 Node.js bcrypt）生成的。虽然部分版本的 Spring Security 可以兼容 $2b$，但存在兼容性风险。
+
+建议: 使用 Java 端 BCryptPasswordEncoder 生成 hash 并替换，或确认当前使用的 Spring Security 版本已支持 $2b$。
+
+#3. application.yml 默认激活 dev profile
+
+spring:
+  profiles:
+    active: dev
+主配置文件默认 active: dev，意味着如果忘记设置 --spring.profiles.active=prod，生产部署也会使用 H2 内存数据库。PR 描述中说"生产环境不受影响"，但这需要运维人员主动指定 prod profile。
+
+建议: 默认不设置 active，或在 docker-compose.yml / Dockerfile.backend 中显式设置 SPRING_PROFILES_ACTIVE=prod。
+
+#4. H2 作为无条件依赖打入生产 JAR
+
+<!-- audit-web/pom.xml -->
+<dependency>
+    <groupId>com.h2database</groupId>
+    <artifactId>h2</artifactId>
+    <scope>runtime</scope>
+</dependency>
+注释说明了这是为开发便利，但 scope=runtime 意味着 H2 驱动会被打入生产 fat JAR（约 2.5MB）。结合 #3，如果生产环境未指定 prod profile，将直接使用 H2 内存库。
+
+建议: 如果不想引入 Maven Profile 复杂度，至少确保 docker-compose.yml 或 Dockerfile.backend 强制指定 SPRING_PROFILES_ACTIVE=prod。
+
+#5. vite.config.ts 设置 allowedHosts: true 禁用了 Host 校验
+
+server: {
+    host: '0.0.0.0',
+    port: 5000,
+    allowedHosts: true,  // <-- 禁用所有 Host 校验
+allowedHosts: true 等价于允许任何 Host 头的请求，这在 Replit 环境中是必要的，但如果此配置被带到其他开发/测试环境中，存在 DNS rebinding 攻击风险。
+
+建议: 加注释说明这是 Replit 专用配置，或改为 allowedHosts: ['*.replit.dev']。
+
+#6. Mapper XML deleteById 缺少审计追踪 (5个 Mapper 受影响)
+PR #1 的审核中已指出 SysUserMapper.xml 的 deleteById 应记录 update_by，且 PR #1 已修复此问题。但 PR #2 新增的 5 个 Mapper XML 的 deleteById 全部没有设置 update_by：
+
+
+<!-- EntEnterpriseMapper.xml, BsEnergyMapper.xml, BsProductMapper.xml, BsUnitMapper.xml, SysRoleMapper.xml -->
+<update id="deleteById">
+    UPDATE xxx SET deleted = 1, update_time = NOW() WHERE id = #{id}
+</update>
+对比已修复的 SysUserMapper.xml:
+
+
+<update id="deleteById">
+    UPDATE sys_user SET deleted = 1, update_by = #{updateBy}, update_time = NOW() WHERE id = #{id}
+</update>
+影响: 软删除操作无法追溯是谁执行的。PR #1 修复了这个问题后，PR #2 又重复引入了同样的问题。
+
+建议: 所有 deleteById 增加 @Param("updateBy") String updateBy 参数和 update_by = #{updateBy} 字段。同时需要修改对应的 Java Mapper 接口签名。
+
+#7. TplTemplateMapper.xml 的 deleteById 同样缺少审计追踪
+与 #6 相同，但此处还需特别注意：TplTemplateMapper.xml 缺少 update_by，且对应的 TplTemplateMapper.java 接口签名为 deleteById(@Param("id") Long id)，需同步修改。
+
+非阻塞建议 (Non-blocking)
+A. package.json 仅做依赖排序
+此 PR 对 package.json 的变更仅是将依赖按字母排序。功能正确，但这类纯格式化变更引入了大量无意义的 diff（以及 3139 行的 package-lock.json）。建议后续将格式化变更单独提交或使用 fixpack 工具统一处理。
+
+B. .replit 和 replit.md 是 Replit 平台特定文件
+这些文件仅在 Replit 平台上有意义。如果团队不使用 Replit，建议加入 .gitignore。如果使用，则当前配置合理。
+
+C. auto-imports.d.ts 和 components.d.ts 是自动生成文件
+这些文件由 unplugin-auto-import 和 unplugin-vue-components 自动生成。通常应加入 .gitignore 以避免 merge conflict。如果团队有意提交这些文件（为了 IDE 类型提示），则可接受。
+
+D. schema-h2.sql 缺少 sys_user_role 的 create_by/create_time 列
+H2 中的 sys_user_role 只有 id, user_id, role_id，但生产 MySQL 还有 create_by, create_time, update_by, update_time, deleted。如果后续有 Mapper XML 操作此表并引用这些列，H2 dev 环境会报错。

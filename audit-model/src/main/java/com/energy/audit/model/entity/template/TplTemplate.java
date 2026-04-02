@@ -22,8 +22,8 @@ public class TplTemplate extends BaseEntity {
     /** Template name */
     private String templateName;
 
-    /** Template category */
-    private String category;
+    /** Module type */
+    private String moduleType;
 
     /** Description */
     private String description;

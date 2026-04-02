@@ -4,23 +4,21 @@
 <mapper namespace="com.energy.audit.dao.mapper.setting.BsUnitMapper">
 
     <resultMap id="BaseResultMap" type="com.energy.audit.model.entity.setting.BsUnit">
-        <id     column="id"                property="id"/>
-        <result column="unit_code"         property="unitCode"/>
-        <result column="unit_name"         property="unitName"/>
-        <result column="symbol"            property="symbol"/>
-        <result column="category"          property="category"/>
-        <result column="conversion_factor" property="conversionFactor"/>
-        <result column="order_num"         property="orderNum"/>
-        <result column="status"            property="status"/>
-        <result column="create_by"         property="createBy"/>
-        <result column="create_time"       property="createTime"/>
-        <result column="update_by"         property="updateBy"/>
-        <result column="update_time"       property="updateTime"/>
-        <result column="deleted"           property="deleted"/>
+        <id     column="id"            property="id"/>
+        <result column="enterprise_id" property="enterpriseId"/>
+        <result column="name"          property="name"/>
+        <result column="unit_type"     property="unitType"/>
+        <result column="sub_category"  property="subCategory"/>
+        <result column="remark"        property="remark"/>
+        <result column="create_by"     property="createBy"/>
+        <result column="create_time"   property="createTime"/>
+        <result column="update_by"     property="updateBy"/>
+        <result column="update_time"   property="updateTime"/>
+        <result column="deleted"       property="deleted"/>
     </resultMap>
 
     <sql id="Base_Column_List">
-        id, unit_code, unit_name, symbol, category, conversion_factor, order_num, status,
+        id, enterprise_id, name, unit_type, sub_category, remark,
         create_by, create_time, update_by, update_time, deleted
     </sql>
 
@@ -34,24 +32,27 @@
         SELECT <include refid="Base_Column_List"/>
         FROM bs_unit
         WHERE deleted = 0
-        <if test="unitName != null and unitName != ''">
-            AND unit_name LIKE CONCAT('%', #{unitName}, '%')
+        <if test="enterpriseId != null">
+            AND enterprise_id = #{enterpriseId}
         </if>
-        <if test="category != null and category != ''">
-            AND category = #{category}
+        <if test="name != null and name != ''">
+            AND name LIKE CONCAT('%', #{name}, '%')
         </if>
-        <if test="status != null">
-            AND status = #{status}
+        <if test="unitType != null">
+            AND unit_type = #{unitType}
         </if>
-        ORDER BY category, order_num
+        <if test="subCategory != null and subCategory != ''">
+            AND sub_category = #{subCategory}
+        </if>
+        ORDER BY unit_type, id
     </select>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO bs_unit (
-            unit_code, unit_name, symbol, category, conversion_factor, order_num, status,
+            enterprise_id, name, unit_type, sub_category, remark,
             create_by, create_time, update_by, update_time, deleted
         ) VALUES (
-            #{unitCode}, #{unitName}, #{symbol}, #{category}, #{conversionFactor}, #{orderNum}, #{status},
+            #{enterpriseId}, #{name}, #{unitType}, #{subCategory}, #{remark},
             #{createBy}, NOW(), #{updateBy}, NOW(), 0
         )
     </insert>
@@ -61,19 +62,17 @@
         <set>
             update_time = NOW(),
             <if test="updateBy != null">update_by = #{updateBy},</if>
-            <if test="unitName != null">unit_name = #{unitName},</if>
-            <if test="symbol != null">symbol = #{symbol},</if>
-            <if test="category != null">category = #{category},</if>
-            <if test="conversionFactor != null">conversion_factor = #{conversionFactor},</if>
-            <if test="orderNum != null">order_num = #{orderNum},</if>
-            <if test="status != null">status = #{status},</if>
+            <if test="name != null">name = #{name},</if>
+            <if test="unitType != null">unit_type = #{unitType},</if>
+            <if test="subCategory != null">sub_category = #{subCategory},</if>
+            <if test="remark != null">remark = #{remark},</if>
         </set>
         WHERE id = #{id} AND deleted = 0
     </update>
 
     <update id="deleteById">
         UPDATE bs_unit
-        SET deleted = 1, update_time = NOW()
+        SET deleted = 1, update_by = #{updateBy}, update_time = NOW()
         WHERE id = #{id}
     </update>
 

@@ -4,29 +4,28 @@
 <mapper namespace="com.energy.audit.dao.mapper.enterprise.EntEnterpriseMapper">
 
     <resultMap id="BaseResultMap" type="com.energy.audit.model.entity.enterprise.EntEnterprise">
-        <id     column="id"             property="id"/>
-        <result column="name"           property="name"/>
-        <result column="credit_code"    property="creditCode"/>
-        <result column="industry_type"  property="industryType"/>
-        <result column="province"       property="province"/>
-        <result column="city"           property="city"/>
-        <result column="district"       property="district"/>
-        <result column="address"        property="address"/>
-        <result column="contact_person" property="contactPerson"/>
-        <result column="contact_phone"  property="contactPhone"/>
-        <result column="contact_email"  property="contactEmail"/>
-        <result column="status"         property="status"/>
-        <result column="remark"         property="remark"/>
-        <result column="create_by"      property="createBy"/>
-        <result column="create_time"    property="createTime"/>
-        <result column="update_by"      property="updateBy"/>
-        <result column="update_time"    property="updateTime"/>
-        <result column="deleted"        property="deleted"/>
+        <id     column="id"               property="id"/>
+        <result column="enterprise_name"  property="enterpriseName"/>
+        <result column="credit_code"      property="creditCode"/>
+        <result column="contact_person"   property="contactPerson"/>
+        <result column="contact_email"    property="contactEmail"/>
+        <result column="contact_phone"    property="contactPhone"/>
+        <result column="remark"           property="remark"/>
+        <result column="expire_date"      property="expireDate"/>
+        <result column="is_locked"        property="isLocked"/>
+        <result column="is_active"        property="isActive"/>
+        <result column="last_login_time"  property="lastLoginTime"/>
+        <result column="sort_order"       property="sortOrder"/>
+        <result column="create_by"        property="createBy"/>
+        <result column="create_time"      property="createTime"/>
+        <result column="update_by"        property="updateBy"/>
+        <result column="update_time"      property="updateTime"/>
+        <result column="deleted"          property="deleted"/>
     </resultMap>
 
     <sql id="Base_Column_List">
-        id, name, credit_code, industry_type, province, city, district, address,
-        contact_person, contact_phone, contact_email, status, remark,
+        id, enterprise_name, credit_code, contact_person, contact_email, contact_phone,
+        remark, expire_date, is_locked, is_active, last_login_time, sort_order,
         create_by, create_time, update_by, update_time, deleted
     </sql>
 
@@ -40,26 +39,23 @@
         SELECT <include refid="Base_Column_List"/>
         FROM ent_enterprise
         WHERE deleted = 0
-        <if test="name != null and name != ''">
-            AND name LIKE CONCAT('%', #{name}, '%')
+        <if test="enterpriseName != null and enterpriseName != ''">
+            AND enterprise_name LIKE CONCAT('%', #{enterpriseName}, '%')
         </if>
-        <if test="industryType != null and industryType != ''">
-            AND industry_type = #{industryType}
+        <if test="isActive != null">
+            AND is_active = #{isActive}
         </if>
-        <if test="status != null">
-            AND status = #{status}
-        </if>
-        ORDER BY create_time DESC
+        ORDER BY sort_order ASC, create_time DESC
     </select>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO ent_enterprise (
-            name, credit_code, industry_type, province, city, district, address,
-            contact_person, contact_phone, contact_email, status, remark,
+            enterprise_name, credit_code, contact_person, contact_email, contact_phone,
+            remark, expire_date, is_locked, is_active, sort_order,
             create_by, create_time, update_by, update_time, deleted
         ) VALUES (
-            #{name}, #{creditCode}, #{industryType}, #{province}, #{city}, #{district}, #{address},
-            #{contactPerson}, #{contactPhone}, #{contactEmail}, #{status}, #{remark},
+            #{enterpriseName}, #{creditCode}, #{contactPerson}, #{contactEmail}, #{contactPhone},
+            #{remark}, #{expireDate}, #{isLocked}, #{isActive}, #{sortOrder},
             #{createBy}, NOW(), #{updateBy}, NOW(), 0
         )
     </insert>
@@ -69,25 +65,23 @@
         <set>
             update_time = NOW(),
             <if test="updateBy != null">update_by = #{updateBy},</if>
-            <if test="name != null">name = #{name},</if>
+            <if test="enterpriseName != null">enterprise_name = #{enterpriseName},</if>
             <if test="creditCode != null">credit_code = #{creditCode},</if>
-            <if test="industryType != null">industry_type = #{industryType},</if>
-            <if test="province != null">province = #{province},</if>
-            <if test="city != null">city = #{city},</if>
-            <if test="district != null">district = #{district},</if>
-            <if test="address != null">address = #{address},</if>
             <if test="contactPerson != null">contact_person = #{contactPerson},</if>
-            <if test="contactPhone != null">contact_phone = #{contactPhone},</if>
             <if test="contactEmail != null">contact_email = #{contactEmail},</if>
-            <if test="status != null">status = #{status},</if>
+            <if test="contactPhone != null">contact_phone = #{contactPhone},</if>
             <if test="remark != null">remark = #{remark},</if>
+            <if test="expireDate != null">expire_date = #{expireDate},</if>
+            <if test="isLocked != null">is_locked = #{isLocked},</if>
+            <if test="isActive != null">is_active = #{isActive},</if>
+            <if test="sortOrder != null">sort_order = #{sortOrder},</if>
         </set>
         WHERE id = #{id} AND deleted = 0
     </update>
 
     <update id="deleteById">
         UPDATE ent_enterprise
-        SET deleted = 1, update_time = NOW()
+        SET deleted = 1, update_by = #{updateBy}, update_time = NOW()
         WHERE id = #{id}
     </update>
 

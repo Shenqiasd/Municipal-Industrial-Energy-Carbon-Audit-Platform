@@ -7,7 +7,7 @@
         <id     column="id"          property="id"/>
         <result column="role_name"   property="roleName"/>
         <result column="role_key"    property="roleKey"/>
-        <result column="order_num"   property="orderNum"/>
+        <result column="sort_order"  property="sortOrder"/>
         <result column="status"      property="status"/>
         <result column="remark"      property="remark"/>
         <result column="create_by"   property="createBy"/>
@@ -18,7 +18,7 @@
     </resultMap>
 
     <sql id="Base_Column_List">
-        id, role_name, role_key, order_num, status, remark,
+        id, role_name, role_key, sort_order, status, remark,
         create_by, create_time, update_by, update_time, deleted
     </sql>
 
@@ -41,15 +41,15 @@
         <if test="status != null">
             AND status = #{status}
         </if>
-        ORDER BY order_num
+        ORDER BY sort_order
     </select>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO sys_role (
-            role_name, role_key, order_num, status, remark,
+            role_name, role_key, sort_order, status, remark,
             create_by, create_time, update_by, update_time, deleted
         ) VALUES (
-            #{roleName}, #{roleKey}, #{orderNum}, #{status}, #{remark},
+            #{roleName}, #{roleKey}, #{sortOrder}, #{status}, #{remark},
             #{createBy}, NOW(), #{updateBy}, NOW(), 0
         )
     </insert>
@@ -61,7 +61,7 @@
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="roleName != null">role_name = #{roleName},</if>
             <if test="roleKey != null">role_key = #{roleKey},</if>
-            <if test="orderNum != null">order_num = #{orderNum},</if>
+            <if test="sortOrder != null">sort_order = #{sortOrder},</if>
             <if test="status != null">status = #{status},</if>
             <if test="remark != null">remark = #{remark},</if>
         </set>
@@ -70,7 +70,7 @@
 
     <update id="deleteById">
         UPDATE sys_role
-        SET deleted = 1, update_time = NOW()
+        SET deleted = 1, update_by = #{updateBy}, update_time = NOW()
         WHERE id = #{id}
     </update>
 
