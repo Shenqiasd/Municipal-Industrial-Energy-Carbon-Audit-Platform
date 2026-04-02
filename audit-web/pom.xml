@@ -53,24 +53,17 @@
             <artifactId>mysql-connector-j</artifactId>
             <scope>runtime</scope>
         </dependency>
-    </dependencies>
 
-    <!-- H2 in-memory DB is activated ONLY when building with -P dev.
-         Production builds (mvn package without -P dev) do NOT include H2.
-         Usage: mvn package -DskipTests -pl audit-web -am -P dev
-                mvn spring-boot:run -pl audit-web -am -P dev -->
-    <profiles>
-        <profile>
-            <id>dev</id>
-            <dependencies>
-                <dependency>
-                    <groupId>com.h2database</groupId>
-                    <artifactId>h2</artifactId>
-                    <scope>runtime</scope>
-                </dependency>
-            </dependencies>
-        </profile>
-    </profiles>
+        <!-- H2 in-memory database for dev/CI (Spring profile: dev).
+             Included unconditionally so 'mvn spring-boot:run -pl audit-web'
+             works without -P dev. H2 is not activated in production because
+             application-prod.yml configures MySQL exclusively. -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+    </dependencies>
 
     <build>
         <plugins>

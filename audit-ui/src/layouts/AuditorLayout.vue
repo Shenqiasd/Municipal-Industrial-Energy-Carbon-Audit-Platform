@@ -1,26 +1,18 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { auditorMenus } from '@/config/menus'
-import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 
-const showChangePwd = ref(false)
 const username = computed(() => userStore.userInfo?.realName || '审核员')
 
 function isActive(path: string) { return route.path === path || route.path.startsWith(path + '/') }
 function navigate(path: string) { router.push(path) }
 function logout() { userStore.logout(); router.push('/login') }
-
-onMounted(() => {
-  if (userStore.needChangePassword) {
-    showChangePwd.value = true
-  }
-})
 </script>
 
 <template>
@@ -66,8 +58,6 @@ onMounted(() => {
       </header>
       <main class="layout-main"><router-view /></main>
     </div>
-
-    <ChangePasswordDialog v-model="showChangePwd" />
   </div>
 </template>
 
