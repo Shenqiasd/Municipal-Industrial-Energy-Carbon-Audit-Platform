@@ -57,6 +57,9 @@ public class TagMappingServiceImpl implements TagMappingService {
                 TplTagMapping newMapping = new TplTagMapping();
                 newMapping.setTemplateVersionId(versionId);
                 newMapping.setTagName(tagName);
+                // Use tagName as default fieldName to satisfy NOT NULL constraint;
+                // admin can reconfigure via the tag-config panel.
+                newMapping.setFieldName(tagName);
                 newMapping.setDataType("STRING");
                 newMapping.setRequired(0);
                 newMapping.setSheetIndex(0);
