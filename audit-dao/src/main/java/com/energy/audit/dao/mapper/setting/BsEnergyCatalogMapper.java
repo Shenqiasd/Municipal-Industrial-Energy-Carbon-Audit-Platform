@@ -16,6 +16,8 @@ public interface BsEnergyCatalogMapper {
 
     List<BsEnergyCatalog> selectList(BsEnergyCatalog query);
 
+    List<BsEnergyCatalog> selectByCategory(@Param("category") String category);
+
     int insert(BsEnergyCatalog catalog);
 
     int updateById(BsEnergyCatalog catalog);

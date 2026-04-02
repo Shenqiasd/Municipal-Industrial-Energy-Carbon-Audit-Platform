@@ -14,6 +14,8 @@ public interface BsProductMapper {
 
     BsProduct selectById(@Param("id") Long id);
 
+    BsProduct selectByIdAndEnterprise(@Param("id") Long id, @Param("enterpriseId") Long enterpriseId);
+
     List<BsProduct> selectList(BsProduct query);
 
     int insert(BsProduct product);

@@ -10,7 +10,7 @@ import java.util.List;
  */
 public interface UnitSettingService {
 
-    BsUnit getById(Long id);
+    BsUnit getByIdForEnterprise(Long id, Long enterpriseId);
 
     List<BsUnit> list(BsUnit query);
 

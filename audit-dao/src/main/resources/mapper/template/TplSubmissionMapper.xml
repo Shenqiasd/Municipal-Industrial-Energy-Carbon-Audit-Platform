@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.energy.audit.dao.mapper.template.TplSubmissionMapper">
+
+    <resultMap id="BaseResultMap" type="com.energy.audit.model.entity.template.TplSubmission">
+        <id     column="id"               property="id"/>
+        <result column="enterprise_id"    property="enterpriseId"/>
+        <result column="template_id"      property="templateId"/>
+        <result column="template_version" property="templateVersion"/>
+        <result column="audit_year"       property="auditYear"/>
+        <result column="submission_json"  property="submissionJson"/>
+        <result column="extracted_data"   property="extractedData"/>
+        <result column="status"           property="status"/>
+        <result column="submit_time"      property="submitTime"/>
+        <result column="create_by"        property="createBy"/>
+        <result column="create_time"      property="createTime"/>
+        <result column="update_by"        property="updateBy"/>
+        <result column="update_time"      property="updateTime"/>
+        <result column="deleted"          property="deleted"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, enterprise_id, template_id, template_version, audit_year,
+        submission_json, extracted_data, status, submit_time,
+        create_by, create_time, update_by, update_time, deleted
+    </sql>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM tpl_submission
+        WHERE id = #{id} AND deleted = 0
+    </select>
+
+    <select id="selectByIdAndEnterprise" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM tpl_submission
+        WHERE id = #{id} AND enterprise_id = #{enterpriseId} AND deleted = 0
+    </select>
+
+    <select id="selectByEnterpriseTemplateYear" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM tpl_submission
+        WHERE enterprise_id = #{enterpriseId}
+          AND template_id   = #{templateId}
+          AND audit_year    = #{auditYear}
+          AND deleted = 0
+        ORDER BY create_time DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectListByEnterprise" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM tpl_submission
+        WHERE enterprise_id = #{enterpriseId} AND deleted = 0
+        ORDER BY create_time DESC
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO tpl_submission (
+            enterprise_id, template_id, template_version, audit_year,
+            submission_json, extracted_data, status, submit_time,
+            create_by, create_time, update_by, update_time, deleted
+        ) VALUES (
+            #{enterpriseId}, #{templateId}, #{templateVersion}, #{auditYear},
+            #{submissionJson}, #{extractedData}, COALESCE(#{status}, 0), #{submitTime},
+            #{createBy}, NOW(), #{updateBy}, NOW(), 0
+        )
+    </insert>
+
+    <update id="updateById">
+        UPDATE tpl_submission
+        <set>
+            update_time = NOW(),
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="submissionJson != null">submission_json = #{submissionJson},</if>
+            <if test="extractedData != null">extracted_data = #{extractedData},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="submitTime != null">submit_time = #{submitTime},</if>
+            <if test="templateVersion != null">template_version = #{templateVersion},</if>
+        </set>
+        WHERE id = #{id} AND deleted = 0
+    </update>
+
+</mapper>

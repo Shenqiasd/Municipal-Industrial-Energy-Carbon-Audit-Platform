@@ -7,8 +7,7 @@ import lombok.EqualsAndHashCode;
 import java.io.Serial;
 
 /**
- * Unit-energy association entity — matches bs_unit_energy production schema.
- * Links a bs_unit to its associated bs_energy records.
+ * Unit-energy association entity
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -17,9 +16,11 @@ public class BsUnitEnergy extends BaseEntity {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    /** Unit ID -> bs_unit.id */
     private Long unitId;
 
-    /** Energy ID -> bs_energy.id */
     private Long energyId;
+
+    private String energyName;
+
+    private String measurementUnit;
 }

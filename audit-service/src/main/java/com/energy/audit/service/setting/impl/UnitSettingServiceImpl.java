@@ -13,9 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-/**
- * Unit setting service implementation
- */
 @Service
 public class UnitSettingServiceImpl implements UnitSettingService {
 
@@ -32,19 +29,17 @@ public class UnitSettingServiceImpl implements UnitSettingService {
     }
 
     @Override
-    public BsUnit getById(Long id) {
-        BsUnit unit = unitMapper.selectById(id);
+    public BsUnit getByIdForEnterprise(Long id, Long enterpriseId) {
+        BsUnit unit = unitMapper.selectByIdAndEnterprise(id, enterpriseId);
         if (unit == null) {
-            throw new BusinessException("Unit not found: " + id);
+            throw new BusinessException("Unit not found or access denied: " + id);
         }
         return unit;
     }
 
     @Override
     public List<BsUnit> list(BsUnit query) {
-        if (query.getEnterpriseId() == null) {
-            query.setEnterpriseId(SecurityUtils.getCurrentEnterpriseId());
-        }
+        query.setEnterpriseId(SecurityUtils.getRequiredCurrentEnterpriseId());
         return unitMapper.selectList(query);
     }
 
@@ -52,18 +47,16 @@ public class UnitSettingServiceImpl implements UnitSettingService {
     @Transactional
     public void create(BsUnit unit) {
         String operator = SecurityUtils.getCurrentUsername();
-        Long enterpriseId = SecurityUtils.getCurrentEnterpriseId();
         unit.setCreateBy(operator);
         unit.setUpdateBy(operator);
-        if (unit.getEnterpriseId() == null) {
-            unit.setEnterpriseId(enterpriseId);
-        }
+        unit.setEnterpriseId(SecurityUtils.getRequiredCurrentEnterpriseId());
         unitMapper.insert(unit);
     }
 
     @Override
     public void update(BsUnit unit) {
-        getById(unit.getId());
+        Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
+        getByIdForEnterprise(unit.getId(), enterpriseId);
         unit.setUpdateBy(SecurityUtils.getCurrentUsername());
         unitMapper.updateById(unit);
     }
@@ -71,7 +64,8 @@ public class UnitSettingServiceImpl implements UnitSettingService {
     @Override
     @Transactional
     public void delete(Long id) {
-        getById(id);
+        Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
+        getByIdForEnterprise(id, enterpriseId);
         String operator = SecurityUtils.getCurrentUsername();
         unitMapper.deleteById(id, operator);
         unitEnergyMapper.deleteAllByUnitId(id, operator);
@@ -79,15 +73,21 @@ public class UnitSettingServiceImpl implements UnitSettingService {
 
     @Override
     public List<BsUnitEnergy> getUnitEnergies(Long unitId) {
+        Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
+        getByIdForEnterprise(unitId, enterpriseId);
         return unitEnergyMapper.selectByUnitId(unitId);
     }
 
     @Override
     @Transactional
     public void addUnitEnergy(Long unitId, Long energyId) {
-        getById(unitId);
-        if (energyMapper.selectById(energyId) == null) {
-            throw new BusinessException("Energy not found: " + energyId);
+        Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
+        getByIdForEnterprise(unitId, enterpriseId);
+        if (energyMapper.selectByIdAndEnterprise(energyId, enterpriseId) == null) {
+            throw new BusinessException("Energy not found or access denied: " + energyId);
+        }
+        if (unitEnergyMapper.selectByUnitIdAndEnergyId(unitId, energyId) != null) {
+            throw new BusinessException("Energy already associated with this unit");
         }
         String operator = SecurityUtils.getCurrentUsername();
         BsUnitEnergy ue = new BsUnitEnergy();
@@ -101,6 +101,8 @@ public class UnitSettingServiceImpl implements UnitSettingService {
     @Override
     @Transactional
     public void removeUnitEnergy(Long unitId, Long energyId) {
+        Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
+        getByIdForEnterprise(unitId, enterpriseId);
         unitEnergyMapper.deleteByUnitIdAndEnergyId(unitId, energyId, SecurityUtils.getCurrentUsername());
     }
 }

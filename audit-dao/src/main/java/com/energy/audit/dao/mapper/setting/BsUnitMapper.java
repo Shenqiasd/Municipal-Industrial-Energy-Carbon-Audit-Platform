@@ -14,6 +14,8 @@ public interface BsUnitMapper {
 
     BsUnit selectById(@Param("id") Long id);
 
+    BsUnit selectByIdAndEnterprise(@Param("id") Long id, @Param("enterpriseId") Long enterpriseId);
+
     List<BsUnit> selectList(BsUnit query);
 
     int insert(BsUnit unit);

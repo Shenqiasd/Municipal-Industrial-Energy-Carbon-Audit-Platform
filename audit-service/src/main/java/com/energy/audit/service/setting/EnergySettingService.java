@@ -9,7 +9,7 @@ import java.util.List;
  */
 public interface EnergySettingService {
 
-    BsEnergy getById(Long id);
+    BsEnergy getByIdForEnterprise(Long id, Long enterpriseId);
 
     List<BsEnergy> list(BsEnergy query);
 

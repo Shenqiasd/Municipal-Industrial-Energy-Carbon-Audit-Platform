@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.energy.audit.dao.mapper.template.TplTagMappingMapper">
+
+    <resultMap id="BaseResultMap" type="com.energy.audit.model.entity.template.TplTagMapping">
+        <id     column="id"                   property="id"/>
+        <result column="template_version_id"  property="templateVersionId"/>
+        <result column="tag_name"             property="tagName"/>
+        <result column="field_name"           property="fieldName"/>
+        <result column="target_table"         property="targetTable"/>
+        <result column="data_type"            property="dataType"/>
+        <result column="dict_type"            property="dictType"/>
+        <result column="required"             property="required"/>
+        <result column="sheet_index"          property="sheetIndex"/>
+        <result column="cell_range"           property="cellRange"/>
+        <result column="remark"               property="remark"/>
+        <result column="create_by"            property="createBy"/>
+        <result column="create_time"          property="createTime"/>
+        <result column="update_by"            property="updateBy"/>
+        <result column="update_time"          property="updateTime"/>
+        <result column="deleted"              property="deleted"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, template_version_id, tag_name, field_name, target_table, data_type,
+        dict_type, required, sheet_index, cell_range, remark,
+        create_by, create_time, update_by, update_time, deleted
+    </sql>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM tpl_tag_mapping
+        WHERE id = #{id} AND deleted = 0
+    </select>
+
+    <select id="selectListByVersionId" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM tpl_tag_mapping
+        WHERE template_version_id = #{templateVersionId} AND deleted = 0
+        ORDER BY id ASC
+    </select>
+
+    <insert id="batchInsert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO tpl_tag_mapping (
+            template_version_id, tag_name, field_name, target_table, data_type,
+            dict_type, required, sheet_index, cell_range, remark,
+            create_by, create_time, update_by, update_time, deleted
+        ) VALUES
+        <foreach collection="list" item="m" separator=",">
+        (
+            #{m.templateVersionId}, #{m.tagName}, #{m.fieldName}, #{m.targetTable}, #{m.dataType},
+            #{m.dictType}, COALESCE(#{m.required}, 0), COALESCE(#{m.sheetIndex}, 0), #{m.cellRange}, #{m.remark},
+            #{m.createBy}, NOW(), #{m.updateBy}, NOW(), 0
+        )
+        </foreach>
+    </insert>
+
+    <update id="updateById">
+        UPDATE tpl_tag_mapping
+        <set>
+            update_time = NOW(),
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="tagName != null">tag_name = #{tagName},</if>
+            <if test="fieldName != null">field_name = #{fieldName},</if>
+            <if test="targetTable != null">target_table = #{targetTable},</if>
+            <if test="dataType != null">data_type = #{dataType},</if>
+            <if test="dictType != null">dict_type = #{dictType},</if>
+            <if test="required != null">required = #{required},</if>
+            <if test="sheetIndex != null">sheet_index = #{sheetIndex},</if>
+            <if test="cellRange != null">cell_range = #{cellRange},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </set>
+        WHERE id = #{id} AND deleted = 0
+    </update>
+
+    <update id="deleteByVersionId">
+        UPDATE tpl_tag_mapping
+        SET deleted = 1, update_by = #{updateBy}, update_time = NOW()
+        WHERE template_version_id = #{templateVersionId} AND deleted = 0
+    </update>
+
+</mapper>

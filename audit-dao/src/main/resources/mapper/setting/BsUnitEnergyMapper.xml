@@ -4,25 +4,41 @@
 <mapper namespace="com.energy.audit.dao.mapper.setting.BsUnitEnergyMapper">
 
     <resultMap id="BaseResultMap" type="com.energy.audit.model.entity.setting.BsUnitEnergy">
-        <id     column="id"          property="id"/>
-        <result column="unit_id"     property="unitId"/>
-        <result column="energy_id"   property="energyId"/>
-        <result column="create_by"   property="createBy"/>
-        <result column="create_time" property="createTime"/>
-        <result column="update_by"   property="updateBy"/>
-        <result column="update_time" property="updateTime"/>
-        <result column="deleted"     property="deleted"/>
+        <id     column="id"               property="id"/>
+        <result column="unit_id"          property="unitId"/>
+        <result column="energy_id"        property="energyId"/>
+        <result column="energy_name"      property="energyName"/>
+        <result column="measurement_unit" property="measurementUnit"/>
+        <result column="create_by"        property="createBy"/>
+        <result column="create_time"      property="createTime"/>
+        <result column="update_by"        property="updateBy"/>
+        <result column="update_time"      property="updateTime"/>
+        <result column="deleted"          property="deleted"/>
     </resultMap>
 
     <select id="selectByUnitId" resultMap="BaseResultMap">
-        SELECT id, unit_id, energy_id, create_by, create_time, update_by, update_time, deleted
-        FROM bs_unit_energy
-        WHERE unit_id = #{unitId} AND deleted = 0
+        SELECT ue.id, ue.unit_id, ue.energy_id,
+               e.name AS energy_name, e.measurement_unit,
+               ue.create_by, ue.create_time, ue.update_by, ue.update_time, ue.deleted
+        FROM bs_unit_energy ue
+        LEFT JOIN bs_energy e ON e.id = ue.energy_id AND e.deleted = 0
+        WHERE ue.unit_id = #{unitId} AND ue.deleted = 0
     </select>
 
-    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    <select id="selectByUnitIdAndEnergyId" resultMap="BaseResultMap">
+        SELECT id, unit_id, energy_id, create_by, create_time, update_by, update_time, deleted
+        FROM bs_unit_energy
+        WHERE unit_id = #{unitId} AND energy_id = #{energyId} AND deleted = 0
+        LIMIT 1
+    </select>
+
+    <insert id="insert">
         INSERT INTO bs_unit_energy (unit_id, energy_id, create_by, create_time, update_by, update_time, deleted)
         VALUES (#{unitId}, #{energyId}, #{createBy}, NOW(), #{updateBy}, NOW(), 0)
+        ON DUPLICATE KEY UPDATE
+            deleted     = 0,
+            update_by   = VALUES(update_by),
+            update_time = NOW()
     </insert>
 
     <update id="deleteByUnitIdAndEnergyId">

@@ -16,9 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-/**
- * Energy setting service implementation
- */
 @Service
 public class EnergySettingServiceImpl implements EnergySettingService {
 
@@ -33,20 +30,18 @@ public class EnergySettingServiceImpl implements EnergySettingService {
     }
 
     @Override
-    @Cacheable(cacheNames = "energyCache", key = "#id")
-    public BsEnergy getById(Long id) {
-        BsEnergy energy = energyMapper.selectById(id);
+    @Cacheable(cacheNames = "energyCache", key = "#id + '_' + #enterpriseId")
+    public BsEnergy getByIdForEnterprise(Long id, Long enterpriseId) {
+        BsEnergy energy = energyMapper.selectByIdAndEnterprise(id, enterpriseId);
         if (energy == null) {
-            throw new BusinessException("Energy setting not found: " + id);
+            throw new BusinessException("Energy not found or access denied: " + id);
         }
         return energy;
     }
 
     @Override
     public List<BsEnergy> list(BsEnergy query) {
-        if (query.getEnterpriseId() == null) {
-            query.setEnterpriseId(SecurityUtils.getCurrentEnterpriseId());
-        }
+        query.setEnterpriseId(SecurityUtils.getRequiredCurrentEnterpriseId());
         return energyMapper.selectList(query);
     }
 
@@ -54,12 +49,9 @@ public class EnergySettingServiceImpl implements EnergySettingService {
     @CacheEvict(cacheNames = "energyCache", allEntries = true)
     public void create(BsEnergy energy) {
         String operator = SecurityUtils.getCurrentUsername();
-        Long enterpriseId = SecurityUtils.getCurrentEnterpriseId();
         energy.setCreateBy(operator);
         energy.setUpdateBy(operator);
-        if (energy.getEnterpriseId() == null) {
-            energy.setEnterpriseId(enterpriseId);
-        }
+        energy.setEnterpriseId(SecurityUtils.getRequiredCurrentEnterpriseId());
         if (energy.getIsActive() == null) {
             energy.setIsActive(1);
         }
@@ -67,17 +59,19 @@ public class EnergySettingServiceImpl implements EnergySettingService {
     }
 
     @Override
-    @CacheEvict(cacheNames = "energyCache", key = "#energy.id")
+    @CacheEvict(cacheNames = "energyCache", allEntries = true)
     public void update(BsEnergy energy) {
-        getById(energy.getId());
+        Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
+        getByIdForEnterprise(energy.getId(), enterpriseId);
         energy.setUpdateBy(SecurityUtils.getCurrentUsername());
         energyMapper.updateById(energy);
     }
 
     @Override
-    @CacheEvict(cacheNames = "energyCache", key = "#id")
+    @CacheEvict(cacheNames = "energyCache", allEntries = true)
     public void delete(Long id) {
-        getById(id);
+        Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
+        getByIdForEnterprise(id, enterpriseId);
         energyMapper.deleteById(id, SecurityUtils.getCurrentUsername());
     }
 
@@ -89,14 +83,15 @@ public class EnergySettingServiceImpl implements EnergySettingService {
             return;
         }
         String operator = SecurityUtils.getCurrentUsername();
-        Long enterpriseId = SecurityUtils.getCurrentEnterpriseId();
-        if (enterpriseId == null) {
-            throw new BusinessException("Enterprise context not found — must be called by an enterprise user");
-        }
+        Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
         for (Long catalogId : catalogIds) {
             BsEnergyCatalog catalog = catalogMapper.selectById(catalogId);
             if (catalog == null) {
                 log.warn("Catalog entry {} not found, skipping", catalogId);
+                continue;
+            }
+            if (energyMapper.selectByEnterpriseAndName(enterpriseId, catalog.getName()) != null) {
+                log.warn("Energy '{}' already exists for enterprise {}, skipping", catalog.getName(), enterpriseId);
                 continue;
             }
             BsEnergy energy = new BsEnergy();

@@ -26,9 +26,7 @@ public class EnterpriseSettingServiceImpl implements EnterpriseSettingService {
     @Override
     public void save(EntEnterpriseSetting setting) {
         String operator = SecurityUtils.getCurrentUsername();
-        if (setting.getCreateBy() == null) {
-            setting.setCreateBy(operator);
-        }
+        setting.setCreateBy(operator);
         setting.setUpdateBy(operator);
         settingMapper.upsert(setting);
     }

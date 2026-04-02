@@ -9,7 +9,7 @@ import java.util.List;
  */
 public interface ProductSettingService {
 
-    BsProduct getById(Long id);
+    BsProduct getByIdForEnterprise(Long id, Long enterpriseId);
 
     List<BsProduct> list(BsProduct query);
 
