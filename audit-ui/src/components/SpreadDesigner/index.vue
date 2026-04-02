@@ -7,12 +7,12 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
  * Props:
  *   templateJson — SpreadJS workbook JSON string to load on mount.
  *   readonly     — when true:
- *                  • all sheets are protected (no cell editing)
- *                  • the Designer ribbon is hidden and replaced by the view-only ribbon
- *                  • command handling is overridden to block mutating commands
+ *                  • Ribbon filtered to view-safe tabs only (via cloned config)
+ *                  • All sheets are protected (isProtected = true)
+ *                  • Mutating commands are overridden in commandManager
  *
- * Exposed methods:
- *   getJson(): string — serialises the current workbook state to JSON.
+ * Exposed:
+ *   getJson(): string — serialises current workbook state to JSON.
  */
 
 const props = defineProps<{
@@ -37,9 +37,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  try {
-    designer?.destroy?.()
-  } catch (_) {}
+  designer?.destroy?.()
   designer = null
   workbook = null
 })
@@ -48,113 +46,66 @@ function initDesigner(gc: any) {
   if (!containerRef.value) return
 
   const GCDesigner = gc.Spread.Sheets.Designer
-
-  // Choose config based on readonly mode
-  const config: any = props.readonly
-    ? buildReadonlyConfig(gc)
-    : GCDesigner.DefaultConfig
+  const config = props.readonly ? buildReadonlyConfig(GCDesigner) : GCDesigner.DefaultConfig
 
   designer = new GCDesigner.Designer(containerRef.value, config, null)
   workbook = designer.getWorkbook()
 
-  // Load JSON
   if (props.templateJson && props.templateJson !== '{}') {
-    try {
-      workbook.fromJSON(JSON.parse(props.templateJson))
-    } catch (e) {
-      console.warn('SpreadDesigner: failed to parse templateJson —', e)
-    }
+    workbook.fromJSON(JSON.parse(props.templateJson))
   }
 
   if (props.readonly) {
     applySheetProtection()
-    blockMutatingCommands(gc)
+    blockMutatingCommands()
   }
 }
 
-/**
- * Build a stripped-down designer config for readonly mode:
- * remove all ribbon tabs that contain editing commands, keep only the Home view tab.
- */
-function buildReadonlyConfig(gc: any): any {
-  const GCDesigner = gc.Spread.Sheets.Designer
-  // Deep-clone default config to avoid mutating the shared constant
+/** Strip non-view ribbon tabs so the designer cannot be used for edits. */
+function buildReadonlyConfig(GCDesigner: any): any {
   const base = JSON.parse(JSON.stringify(GCDesigner.DefaultConfig ?? {}))
-
-  // Keep only view-safe ribbon tabs (remove Insert, Formulas, Data, etc.)
-  const viewOnlyTabs = ['home', 'view']
+  const VIEW_TABS = new Set(['home', 'view'])
   if (Array.isArray(base?.ribbon)) {
-    base.ribbon = base.ribbon.filter((tab: any) =>
-      viewOnlyTabs.includes((tab.id ?? '').toLowerCase())
-    )
+    base.ribbon = base.ribbon.filter((tab: any) => VIEW_TABS.has((tab.id ?? '').toLowerCase()))
   }
-
-  // Disable the file menu entries that would mutate data
   if (Array.isArray(base?.fileMenu?.menuItems)) {
-    const allowedFileItems = ['open', 'close']
+    const ALLOWED_FILE = new Set(['open', 'close'])
     base.fileMenu.menuItems = base.fileMenu.menuItems.filter((item: any) =>
-      allowedFileItems.includes((item.commandName ?? '').toLowerCase())
+      ALLOWED_FILE.has((item.commandName ?? '').toLowerCase())
     )
   }
-
   return base
 }
 
-/**
- * Protect every sheet so cells cannot be edited.
- */
+/** Protect all sheets so individual cells cannot be edited. */
 function applySheetProtection() {
-  if (!workbook) return
   const count = workbook.getSheetCount()
   for (let i = 0; i < count; i++) {
-    const sheet = workbook.getSheet(i)
-    sheet.options.isProtected = true
-    // Also lock all cells in the used range
-    sheet.protect({ allowSelectLockedCells: true, allowSelectUnlockedCells: false })
+    workbook.getSheet(i).options.isProtected = true
   }
 }
 
 /**
- * Override the Designer's command infrastructure to swallow any mutating commands,
- * giving a second layer of defence beyond sheet protection.
+ * Override mutating commands in the workbook's commandManager so any ribbon or
+ * keyboard shortcut that slips through the filtered config is also blocked.
  */
-function blockMutatingCommands(gc: any) {
-  if (!designer || !workbook) return
-  try {
-    const commandManager = workbook.commandManager()
-    if (!commandManager) return
+const MUTATING_COMMANDS = [
+  'clear', 'clearContents', 'clearFormat', 'clearAll',
+  'delete', 'insertRows', 'insertColumns', 'deleteRows', 'deleteColumns',
+  'insertSheet', 'deleteSheet', 'editCell', 'commitEdit',
+  'paste', 'cut', 'redo', 'undo', 'sort', 'filter',
+]
 
-    // List of mutating command names to block in readonly mode
-    const BLOCKED = new Set([
-      'clear', 'clearContents', 'clearFormat', 'clearAll',
-      'delete', 'insertRows', 'insertColumns', 'deleteRows', 'deleteColumns',
-      'insertSheet', 'deleteSheet',
-      'editCell', 'commitEdit',
-      'paste', 'cut', 'redo', 'undo',
-      'sort', 'filter',
-    ])
-
-    BLOCKED.forEach((name) => {
-      try {
-        commandManager.register(name, {
-          execute: () => false,
-          canUndo: false,
-        })
-      } catch (_) {}
-    })
-  } catch (e) {
-    console.warn('SpreadDesigner: could not override command manager —', e)
-  }
+function blockMutatingCommands() {
+  const commandManager = workbook.commandManager?.()
+  if (!commandManager) return
+  const noOp = { execute: () => false, canUndo: false }
+  MUTATING_COMMANDS.forEach((name) => commandManager.register(name, noOp))
 }
 
 function getJson(): string {
   if (!workbook) return '{}'
-  try {
-    return JSON.stringify(workbook.toJSON())
-  } catch (e) {
-    console.error('SpreadDesigner.getJson failed', e)
-    return '{}'
-  }
+  return JSON.stringify(workbook.toJSON())
 }
 
 defineExpose({ getJson })

@@ -77,22 +77,28 @@ public class SpreadsheetDataExtractor {
 
     /**
      * Discover all tag names (cell tags + named ranges) in a SpreadJS workbook JSON.
-     * Used by TagMappingService to auto-sync tpl_tag_mapping after a template is saved.
+     * Throws {@link BusinessException} on JSON parse failure so callers can roll back
+     * instead of silently treating all tags as deleted.
      */
     public Set<String> discoverTagNames(String templateJson) {
-        Set<String> result = new HashSet<>();
-        if (templateJson == null || templateJson.isBlank()) return result;
+        if (templateJson == null || templateJson.isBlank()) {
+            throw new BusinessException("模板 JSON 不能为空");
+        }
         try {
             JsonNode root = objectMapper.readTree(templateJson);
+            Set<String> result = new HashSet<>();
             parseNamedRanges(root).keySet().forEach(result::add);
             JsonNode sheets = root.get("sheets");
             if (sheets != null && sheets.isObject()) {
                 parseCellTags(sheets).keySet().forEach(result::add);
             }
+            return result;
+        } catch (BusinessException be) {
+            throw be;
         } catch (Exception e) {
-            log.warn("discoverTagNames: failed to parse templateJson — {}", e.getMessage());
+            log.error("discoverTagNames: failed to parse templateJson — {}", e.getMessage());
+            throw new BusinessException("模板 JSON 解析失败，Tag 同步已中止: " + e.getMessage());
         }
-        return result;
     }
 
     private Map<String, JsonNode> parseNamedRanges(JsonNode root) {
