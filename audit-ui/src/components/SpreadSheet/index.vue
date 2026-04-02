@@ -13,11 +13,14 @@ import {
 const props = defineProps<{
   templateId: number
   auditYear: number
+  /** Whether the parent already acquired the edit lock for this session */
+  hasLock: boolean
   readonly?: boolean
 }>()
 
 const emit = defineEmits<{
   drafted: [submission: TplSubmission]
+  /** Emitted when heartbeat renew fails 2+ consecutive times and the lock is assumed lost */
   lockLost: []
 }>()
 
@@ -32,9 +35,9 @@ let publishedVersion: TplTemplateVersion | null = null
 let currentSubmission: TplSubmission | null = null
 
 /**
- * Tracks whether this component instance holds an active edit lock.
- * Set to true only when parent passed readonly=false AND initWorkbook
- * enters editing mode. Cleared whenever the lock is released.
+ * ownsLock is initialised from props.hasLock at mount time (before any async work),
+ * so every code path — including early returns and exceptions — can call
+ * releaseLockIfOwned() and get the correct behaviour.
  */
 let ownsLock = false
 
@@ -48,15 +51,13 @@ watch(
 )
 
 onMounted(() => {
+  ownsLock = props.hasLock
   initWorkbook()
 })
 
 onBeforeUnmount(() => {
   stopHeartbeat()
-  if (ownsLock) {
-    releaseLock(props.templateId, props.auditYear).catch(() => {})
-    ownsLock = false
-  }
+  releaseLockIfOwned()
   workbook?.destroy()
   workbook = null
 })
@@ -65,6 +66,7 @@ async function initWorkbook() {
   if (!spreadRef.value) return
   if (!window.GC?.Spread?.Sheets?.Workbook) {
     errorMsg.value = 'SpreadJS 未加载，请检查网络连接后刷新页面'
+    releaseLockIfOwned()
     return
   }
   loading.value = true
@@ -91,7 +93,6 @@ async function initWorkbook() {
       applyReadonlyProtection()
       releaseLockIfOwned()
     } else {
-      ownsLock = true
       startHeartbeat()
     }
   } catch (e: any) {

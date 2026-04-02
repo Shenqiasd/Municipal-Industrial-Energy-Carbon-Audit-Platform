@@ -24,6 +24,7 @@ const submitting = ref(false)
 const lockedBy = ref<TplEditLock | null>(null)
 const isReadonly = ref(false)
 const isActive = ref(false)
+const lockAcquired = ref(false)
 
 const spreadRef = ref<InstanceType<typeof SpreadSheet>>()
 
@@ -37,15 +38,18 @@ async function openTemplate() {
   isActive.value = false
   lockedBy.value = null
   isReadonly.value = false
+  lockAcquired.value = false
   lockLoading.value = true
   try {
     await acquireLock(selectedTemplateId.value, selectedYear.value)
     isReadonly.value = false
     lockedBy.value = null
+    lockAcquired.value = true
   } catch (e: any) {
     const msg: string = e?.response?.data?.message ?? e?.message ?? ''
     if (msg.includes('其他用户') || msg.includes('locked') || msg.includes('锁定')) {
       isReadonly.value = true
+      lockAcquired.value = false
       try {
         lockedBy.value = await checkLock(selectedTemplateId.value, selectedYear.value)
       } catch {
@@ -203,6 +207,7 @@ onMounted(async () => {
           ref="spreadRef"
           :templateId="selectedTemplateId"
           :auditYear="selectedYear"
+          :hasLock="lockAcquired"
           :readonly="isReadonly"
           @drafted="() => {}"
           @lock-lost="onLockLost"
