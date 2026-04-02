@@ -2,6 +2,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete, Upload, View } from '@element-plus/icons-vue'
+import SpreadDesigner from '@/components/SpreadDesigner/index.vue'
 import {
   getTemplateList,
   createTemplate,
@@ -11,7 +12,10 @@ import {
   listVersions,
   publishVersion,
   createDraftVersion,
+  getVersionById,
+  saveVersionJson,
   listTags,
+  syncTagsFromJson,
   replaceTags,
   type TplTemplate,
   type TplTemplateVersion,
@@ -30,11 +34,20 @@ const MODULE_OPTIONS = [
   { label: '能效评估', value: 'efficiency' },
 ]
 
+const DATA_TYPE_OPTIONS = [
+  { label: 'STRING', value: 'STRING' },
+  { label: 'NUMBER', value: 'NUMBER' },
+  { label: 'DATE', value: 'DATE' },
+  { label: 'DICT', value: 'DICT' },
+]
+
+// ── Template list ──────────────────────────────────────────────────────────────
 const loading = ref(false)
 const tableData = ref<TplTemplate[]>([])
 const total = ref(0)
 const query = reactive({ templateName: '', moduleType: '', status: undefined as number | undefined, pageNum: 1, pageSize: 20 })
 
+// ── Template create / edit dialog ─────────────────────────────────────────────
 const dialogVisible = ref(false)
 const dialogTitle = ref('')
 const submitting = ref(false)
@@ -45,18 +58,24 @@ const rules = {
   templateName: [{ required: true, message: '请输入模板名称', trigger: 'blur' }],
 }
 
+// ── Version management drawer ─────────────────────────────────────────────────
 const versionDrawer = ref(false)
 const activeTemplate = ref<TplTemplate | null>(null)
 const versions = ref<TplTemplateVersion[]>([])
 const versionsLoading = ref(false)
 const publishingVersion = ref<number | null>(null)
 
-const tagDrawer = ref(false)
-const activeVersion = ref<TplTemplateVersion | null>(null)
-const tags = ref<TplTagMapping[]>([])
-const tagsLoading = ref(false)
-const savingTags = ref(false)
+// ── Designer full-screen dialog ───────────────────────────────────────────────
+const designerDialog = ref(false)
+const designerVersion = ref<TplTemplateVersion | null>(null)
+const designerLoading = ref(false)
+const designerSaving = ref(false)
+const designerTagsLoading = ref(false)
+const designerTagsSaving = ref(false)
+const designerTags = ref<TplTagMapping[]>([])
+const designerRef = ref<InstanceType<typeof SpreadDesigner>>()
 
+// ── Template list methods ──────────────────────────────────────────────────────
 async function loadData() {
   loading.value = true
   try {
@@ -81,6 +100,7 @@ function handleReset() {
   loadData()
 }
 
+// ── Template CRUD methods ──────────────────────────────────────────────────────
 function openCreate() {
   form.value = {}
   dialogTitle.value = '新建模板'
@@ -129,6 +149,7 @@ async function handlePublish(row: TplTemplate) {
   loadData()
 }
 
+// ── Version drawer methods ─────────────────────────────────────────────────────
 async function openVersions(row: TplTemplate) {
   activeTemplate.value = row
   versionDrawer.value = true
@@ -161,49 +182,72 @@ async function handleCreateDraft() {
   versions.value = await listVersions(activeTemplate.value.id!)
 }
 
-async function openTags(v: TplTemplateVersion) {
-  activeVersion.value = v
-  tagDrawer.value = true
-  tagsLoading.value = true
+// ── Designer dialog methods ────────────────────────────────────────────────────
+async function openDesigner(v: TplTemplateVersion) {
+  designerLoading.value = true
+  designerDialog.value = true
   try {
-    tags.value = await listTags(v.id!)
+    const full = await getVersionById(v.id!)
+    designerVersion.value = full
+    // Sync tags only for draft versions; published versions are read-only and
+    // should not mutate tag rows on open.
+    if (full.published !== 1) {
+      await syncTagsFromJson(v.id!)
+    }
   } finally {
-    tagsLoading.value = false
+    designerLoading.value = false
+  }
+  await refreshDesignerTags(v.id!)
+}
+
+async function refreshDesignerTags(versionId: number) {
+  designerTagsLoading.value = true
+  try {
+    designerTags.value = await listTags(versionId)
+  } finally {
+    designerTagsLoading.value = false
   }
 }
 
-function addTagRow() {
-  tags.value.push({
-    templateVersionId: activeVersion.value?.id,
-    tagName: '',
-    fieldName: '',
-    targetTable: '',
-    dataType: 'STRING',
-    required: 0,
-    sheetIndex: 0,
-  })
-}
-
-function removeTagRow(idx: number) {
-  tags.value.splice(idx, 1)
-}
-
-async function saveTags() {
-  if (!activeVersion.value) return
-  savingTags.value = true
+async function handleSaveDesign() {
+  if (!designerVersion.value || !designerRef.value) return
+  designerSaving.value = true
   try {
-    await replaceTags(activeVersion.value.id!, tags.value)
-    ElMessage.success('标签映射已保存')
+    const json = designerRef.value.getJson()
+    await saveVersionJson(designerVersion.value.id!, json)
+    ElMessage.success('草稿已保存，Tag 映射已自动同步')
+    await refreshDesignerTags(designerVersion.value.id!)
   } finally {
-    savingTags.value = false
+    designerSaving.value = false
   }
 }
+
+async function handleSaveDesignerTags() {
+  if (!designerVersion.value) return
+  designerTagsSaving.value = true
+  try {
+    await replaceTags(designerVersion.value.id!, designerTags.value)
+    ElMessage.success('标签配置已保存')
+  } finally {
+    designerTagsSaving.value = false
+  }
+}
+
+function handleDesignerClose() {
+  designerDialog.value = false
+  designerVersion.value = null
+  designerTags.value = []
+}
+
+const isReadonly = (v: TplTemplateVersion | null) => v?.published === 1
 
 onMounted(loadData)
 </script>
 
 <template>
   <div class="page-container">
+
+    <!-- ── Search ── -->
     <el-card class="search-card" shadow="never">
       <el-form :model="query" inline>
         <el-form-item label="模板名称">
@@ -226,6 +270,7 @@ onMounted(loadData)
       </el-form>
     </el-card>
 
+    <!-- ── Table ── -->
     <el-card class="table-card" shadow="never">
       <template #header>
         <div class="card-header">
@@ -276,6 +321,7 @@ onMounted(loadData)
       />
     </el-card>
 
+    <!-- ── Create / Edit Dialog ── -->
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="520px" @close="handleClose">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
         <el-form-item label="模板编码" prop="templateCode">
@@ -299,6 +345,7 @@ onMounted(loadData)
       </template>
     </el-dialog>
 
+    <!-- ── Version Drawer ── -->
     <el-drawer v-model="versionDrawer" :title="`版本管理 — ${activeTemplate?.templateName ?? ''}`" size="680px">
       <div class="drawer-toolbar">
         <el-button type="primary" size="small" :icon="Plus" @click="handleCreateDraft">创建新草稿版本</el-button>
@@ -324,65 +371,121 @@ onMounted(loadData)
               :loading="publishingVersion === row.id"
               :disabled="row.published === 1"
             >发布</el-button>
-            <el-button link type="primary" @click="openTags(row)">标签映射</el-button>
+            <el-button link type="primary" @click="openDesigner(row)">设计</el-button>
           </template>
         </el-table-column>
       </el-table>
     </el-drawer>
 
-    <el-drawer
-      v-model="tagDrawer"
-      :title="`标签映射 — v${activeVersion?.version ?? ''}`"
-      size="880px"
-      direction="rtl"
+    <!-- ── Designer Full-Screen Dialog ── -->
+    <el-dialog
+      v-model="designerDialog"
+      :title="`模板设计器 — ${activeTemplate?.templateName ?? ''} ${designerVersion ? 'v' + designerVersion.version : ''}${isReadonly(designerVersion) ? ' （只读）' : ''}`"
+      fullscreen
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      @close="handleDesignerClose"
+      class="designer-dialog"
     >
-      <div class="drawer-toolbar">
-        <el-button type="primary" size="small" :icon="Plus" @click="addTagRow">添加映射行</el-button>
-        <el-button type="success" size="small" :loading="savingTags" @click="saveTags">保存全部</el-button>
+      <div v-loading="designerLoading" class="designer-layout">
+        <!-- Left: SpreadJS Designer -->
+        <div class="designer-main">
+          <SpreadDesigner
+            v-if="!designerLoading && designerVersion"
+            ref="designerRef"
+            :template-json="designerVersion.templateJson"
+            :readonly="isReadonly(designerVersion)"
+          />
+        </div>
+
+        <!-- Right: Tag Config Panel -->
+        <div class="designer-sidebar">
+          <div class="sidebar-header">
+            <span class="sidebar-title">Tag 映射配置</span>
+            <el-button
+              type="primary"
+              size="small"
+              :loading="designerTagsSaving"
+              :disabled="isReadonly(designerVersion)"
+              @click="handleSaveDesignerTags"
+            >保存标签配置</el-button>
+          </div>
+
+          <el-scrollbar class="sidebar-scroll">
+            <div v-loading="designerTagsLoading" class="tags-panel">
+              <el-empty
+                v-if="!designerTagsLoading && designerTags.length === 0"
+                description="暂无 Tag — 先在设计器中给单元格设置 tag 属性，再点「保存草稿」自动发现"
+                :image-size="80"
+              />
+              <div
+                v-for="tag in designerTags"
+                :key="tag.id ?? tag.tagName"
+                class="tag-item"
+              >
+                <div class="tag-name">
+                  <el-tag size="small" type="info">{{ tag.tagName }}</el-tag>
+                </div>
+                <el-input
+                  v-model="tag.fieldName"
+                  placeholder="字段名 (fieldName)"
+                  size="small"
+                  :disabled="isReadonly(designerVersion)"
+                  style="margin-top:6px"
+                />
+                <el-input
+                  v-model="tag.targetTable"
+                  placeholder="目标表 (targetTable)"
+                  size="small"
+                  :disabled="isReadonly(designerVersion)"
+                  style="margin-top:4px"
+                />
+                <div class="tag-row" style="margin-top:4px">
+                  <el-select
+                    v-model="tag.dataType"
+                    size="small"
+                    style="flex:1"
+                    :disabled="isReadonly(designerVersion)"
+                  >
+                    <el-option
+                      v-for="opt in DATA_TYPE_OPTIONS"
+                      :key="opt.value"
+                      :label="opt.label"
+                      :value="opt.value"
+                    />
+                  </el-select>
+                  <el-checkbox
+                    v-model="tag.required"
+                    :true-value="1"
+                    :false-value="0"
+                    :disabled="isReadonly(designerVersion)"
+                    style="margin-left:8px"
+                  >必填</el-checkbox>
+                </div>
+                <el-input
+                  v-model="tag.dictType"
+                  placeholder="字典类型 (dictType，数据类型为 DICT 时填写)"
+                  size="small"
+                  :disabled="isReadonly(designerVersion)"
+                  style="margin-top:4px"
+                />
+              </div>
+            </div>
+          </el-scrollbar>
+        </div>
       </div>
-      <el-table v-loading="tagsLoading" :data="tags" border size="small" style="margin-top:12px">
-        <el-table-column label="Tag名称" min-width="120">
-          <template #default="{ row }">
-            <el-input v-model="row.tagName" placeholder="tagName" size="small" />
-          </template>
-        </el-table-column>
-        <el-table-column label="字段名" min-width="120">
-          <template #default="{ row }">
-            <el-input v-model="row.fieldName" placeholder="fieldName" size="small" />
-          </template>
-        </el-table-column>
-        <el-table-column label="目标表" min-width="120">
-          <template #default="{ row }">
-            <el-input v-model="row.targetTable" placeholder="targetTable" size="small" />
-          </template>
-        </el-table-column>
-        <el-table-column label="数据类型" width="120">
-          <template #default="{ row }">
-            <el-select v-model="row.dataType" size="small" style="width:100%">
-              <el-option label="STRING" value="STRING" />
-              <el-option label="NUMBER" value="NUMBER" />
-              <el-option label="DATE" value="DATE" />
-              <el-option label="DICT" value="DICT" />
-            </el-select>
-          </template>
-        </el-table-column>
-        <el-table-column label="必填" width="70" align="center">
-          <template #default="{ row }">
-            <el-checkbox v-model="row.required" :true-value="1" :false-value="0" />
-          </template>
-        </el-table-column>
-        <el-table-column label="备注" min-width="100">
-          <template #default="{ row }">
-            <el-input v-model="row.remark" placeholder="备注" size="small" />
-          </template>
-        </el-table-column>
-        <el-table-column label="" width="60" align="center">
-          <template #default="{ $index }">
-            <el-button link type="danger" :icon="Delete" @click="removeTagRow($index)" />
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-drawer>
+
+      <template #footer>
+        <el-button
+          v-if="!isReadonly(designerVersion)"
+          type="primary"
+          :loading="designerSaving"
+          @click="handleSaveDesign"
+        >保存草稿</el-button>
+        <el-button @click="handleDesignerClose">关闭</el-button>
+      </template>
+    </el-dialog>
+
   </div>
 </template>
 
@@ -400,8 +503,6 @@ onMounted(loadData)
   }
 }
 
-.table-card {}
-
 .card-header {
   display: flex;
   align-items: center;
@@ -418,5 +519,84 @@ onMounted(loadData)
   display: flex;
   gap: 8px;
   margin-bottom: 12px;
+}
+
+/* Designer dialog */
+:deep(.designer-dialog .el-dialog__body) {
+  padding: 0;
+  overflow: hidden;
+}
+
+:deep(.designer-dialog .el-dialog__header) {
+  padding: 12px 20px;
+  border-bottom: 1px solid #e4e7ed;
+  margin-right: 0;
+}
+
+:deep(.designer-dialog .el-dialog__footer) {
+  padding: 10px 20px;
+  border-top: 1px solid #e4e7ed;
+}
+
+.designer-layout {
+  display: flex;
+  height: calc(100vh - 112px);
+  overflow: hidden;
+}
+
+.designer-main {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.designer-sidebar {
+  width: 320px;
+  flex-shrink: 0;
+  border-left: 1px solid #e4e7ed;
+  display: flex;
+  flex-direction: column;
+  background: #fafafa;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e4e7ed;
+  background: #fff;
+}
+
+.sidebar-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.sidebar-scroll {
+  flex: 1;
+}
+
+.tags-panel {
+  padding: 12px;
+}
+
+.tag-item {
+  padding: 10px;
+  margin-bottom: 10px;
+  background: #fff;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+}
+
+.tag-name {
+  margin-bottom: 2px;
+}
+
+.tag-row {
+  display: flex;
+  align-items: center;
 }
 </style>

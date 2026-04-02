@@ -106,6 +106,10 @@ export function getPublishedVersion(templateId: number): Promise<TplTemplateVers
   return request.get(`/template/${templateId}/version/published`).then((r: any) => r.data)
 }
 
+export function getVersionById(versionId: number): Promise<TplTemplateVersion> {
+  return request.get(`/template/versions/${versionId}`).then((r: any) => r.data)
+}
+
 export function createDraftVersion(templateId: number): Promise<TplTemplateVersion> {
   return request.post(`/template/${templateId}/versions`).then((r: any) => r.data)
 }
@@ -122,6 +126,10 @@ export function publishVersion(templateId: number, versionId: number): Promise<v
 
 export function listTags(versionId: number): Promise<TplTagMapping[]> {
   return request.get(`/template/versions/${versionId}/tags`).then((r: any) => r.data)
+}
+
+export function syncTagsFromJson(versionId: number): Promise<void> {
+  return request.post(`/template/versions/${versionId}/tags/sync`).then(() => undefined)
 }
 
 export function replaceTags(versionId: number, mappings: TplTagMapping[]): Promise<void> {

@@ -14,4 +14,12 @@ public interface TagMappingService {
 
     /** Return all active mappings for a version */
     List<TplTagMapping> listByVersionId(Long templateVersionId);
+
+    /**
+     * Sync tpl_tag_mapping from the SpreadJS template JSON:
+     * - New tags discovered in JSON but absent from DB → insert with defaults
+     * - Existing tags in DB → keep (preserve admin configuration)
+     * - Tags in DB no longer in JSON → soft-delete
+     */
+    void syncFromTemplateJson(Long versionId, String templateJson);
 }

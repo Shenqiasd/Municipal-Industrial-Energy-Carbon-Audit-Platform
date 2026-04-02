@@ -80,4 +80,31 @@
         WHERE template_version_id = #{templateVersionId} AND deleted = 0
     </update>
 
+    <select id="selectByVersionIdAndTagName" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM tpl_tag_mapping
+        WHERE template_version_id = #{templateVersionId}
+          AND tag_name = #{tagName}
+          AND deleted = 0
+        LIMIT 1
+    </select>
+
+    <update id="softDeleteById">
+        UPDATE tpl_tag_mapping
+        SET deleted = 1, update_by = #{updateBy}, update_time = NOW()
+        WHERE id = #{id} AND deleted = 0
+    </update>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO tpl_tag_mapping (
+            template_version_id, tag_name, field_name, target_table, data_type,
+            dict_type, required, sheet_index, cell_range, remark,
+            create_by, create_time, update_by, update_time, deleted
+        ) VALUES (
+            #{templateVersionId}, #{tagName}, #{fieldName}, #{targetTable}, #{dataType},
+            #{dictType}, COALESCE(#{required}, 0), COALESCE(#{sheetIndex}, 0), #{cellRange}, #{remark},
+            #{createBy}, NOW(), #{updateBy}, NOW(), 0
+        )
+    </insert>
+
 </mapper>

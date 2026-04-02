@@ -153,6 +153,13 @@ public class TemplateController {
         return R.ok(versionService.listVersionsMeta(templateId));
     }
 
+    @Operation(summary = "按 versionId 获取版本详情（含 SpreadJS JSON，仅管理员）")
+    @GetMapping("/versions/{versionId}")
+    public R<TplTemplateVersion> getVersionById(@PathVariable Long versionId) {
+        requireAdmin();
+        return R.ok(versionService.getById(versionId));
+    }
+
     @Operation(summary = "获取已发布版本（含 SpreadJS JSON）")
     @GetMapping("/{templateId}/version/published")
     public R<TplTemplateVersion> getPublishedVersion(@PathVariable Long templateId) {
@@ -195,6 +202,17 @@ public class TemplateController {
     public R<List<TplTagMapping>> listTags(@PathVariable Long versionId) {
         requireAdmin();
         return R.ok(tagMappingService.listByVersionId(versionId));
+    }
+
+    @Operation(summary = "从已保存的 templateJson 重新发现并同步 Tag 映射（管理员打开设计器时调用）")
+    @PostMapping("/versions/{versionId}/tags/sync")
+    public R<Void> syncTagsFromJson(@PathVariable Long versionId) {
+        requireAdmin();
+        TplTemplateVersion version = versionService.getById(versionId);
+        if (version.getTemplateJson() != null && !version.getTemplateJson().isBlank()) {
+            tagMappingService.syncFromTemplateJson(versionId, version.getTemplateJson());
+        }
+        return R.ok();
     }
 
     @Operation(summary = "替换版本的全部标签映射（先删后插）")
