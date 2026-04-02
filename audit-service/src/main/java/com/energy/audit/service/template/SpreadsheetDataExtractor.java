@@ -9,8 +9,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Extracts structured data from SpreadJS JSON using tag mappings
@@ -69,6 +71,26 @@ public class SpreadsheetDataExtractor {
         } catch (Exception e) {
             log.error("Failed to extract data from SpreadJS JSON", e);
             throw new BusinessException("解析电子表格数据失败: " + e.getMessage());
+        }
+        return result;
+    }
+
+    /**
+     * Discover all tag names (cell tags + named ranges) in a SpreadJS workbook JSON.
+     * Used by TagMappingService to auto-sync tpl_tag_mapping after a template is saved.
+     */
+    public Set<String> discoverTagNames(String templateJson) {
+        Set<String> result = new HashSet<>();
+        if (templateJson == null || templateJson.isBlank()) return result;
+        try {
+            JsonNode root = objectMapper.readTree(templateJson);
+            parseNamedRanges(root).keySet().forEach(result::add);
+            JsonNode sheets = root.get("sheets");
+            if (sheets != null && sheets.isObject()) {
+                parseCellTags(sheets).keySet().forEach(result::add);
+            }
+        } catch (Exception e) {
+            log.warn("discoverTagNames: failed to parse templateJson — {}", e.getMessage());
         }
         return result;
     }

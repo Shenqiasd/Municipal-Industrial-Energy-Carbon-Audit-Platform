@@ -6,6 +6,7 @@ import com.energy.audit.dao.mapper.template.TplTemplateMapper;
 import com.energy.audit.dao.mapper.template.TplTemplateVersionMapper;
 import com.energy.audit.model.entity.template.TplTemplate;
 import com.energy.audit.model.entity.template.TplTemplateVersion;
+import com.energy.audit.service.template.TagMappingService;
 import com.energy.audit.service.template.TemplateVersionService;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
@@ -18,11 +19,14 @@ public class TemplateVersionServiceImpl implements TemplateVersionService {
 
     private final TplTemplateVersionMapper versionMapper;
     private final TplTemplateMapper templateMapper;
+    private final TagMappingService tagMappingService;
 
     public TemplateVersionServiceImpl(TplTemplateVersionMapper versionMapper,
-                                      TplTemplateMapper templateMapper) {
+                                      TplTemplateMapper templateMapper,
+                                      TagMappingService tagMappingService) {
         this.versionMapper = versionMapper;
         this.templateMapper = templateMapper;
+        this.tagMappingService = tagMappingService;
     }
 
     @Override
@@ -42,6 +46,7 @@ public class TemplateVersionServiceImpl implements TemplateVersionService {
     }
 
     @Override
+    @Transactional
     public void saveJson(Long versionId, String templateJson, String changeLog) {
         TplTemplateVersion existing = getById(versionId);
         if (existing.getPublished() == 1) {
@@ -53,6 +58,7 @@ public class TemplateVersionServiceImpl implements TemplateVersionService {
         upd.setChangeLog(changeLog);
         upd.setUpdateBy(SecurityUtils.getRequiredCurrentUsername());
         versionMapper.updateById(upd);
+        tagMappingService.syncFromTemplateJson(versionId, templateJson);
     }
 
     @Override

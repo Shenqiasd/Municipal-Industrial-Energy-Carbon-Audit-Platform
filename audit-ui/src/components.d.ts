@@ -37,6 +37,7 @@ declare module 'vue' {
     FlowEditor: typeof import('./components/FlowEditor/index.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    SpreadDesigner: typeof import('./components/SpreadDesigner/index.vue')['default']
     SpreadSheet: typeof import('./components/SpreadSheet/index.vue')['default']
   }
   export interface ComponentCustomProperties {

@@ -153,6 +153,12 @@ public class TemplateController {
         return R.ok(versionService.listVersionsMeta(templateId));
     }
 
+    @Operation(summary = "按 versionId 获取版本详情（含 SpreadJS JSON）")
+    @GetMapping("/versions/{versionId}")
+    public R<TplTemplateVersion> getVersionById(@PathVariable Long versionId) {
+        return R.ok(versionService.getById(versionId));
+    }
+
     @Operation(summary = "获取已发布版本（含 SpreadJS JSON）")
     @GetMapping("/{templateId}/version/published")
     public R<TplTemplateVersion> getPublishedVersion(@PathVariable Long templateId) {
