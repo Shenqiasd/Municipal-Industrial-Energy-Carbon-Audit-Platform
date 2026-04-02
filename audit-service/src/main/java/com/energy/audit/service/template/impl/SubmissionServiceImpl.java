@@ -5,9 +5,11 @@ import com.energy.audit.common.util.SecurityUtils;
 import com.energy.audit.dao.mapper.template.TplSubmissionMapper;
 import com.energy.audit.model.entity.template.TplSubmission;
 import com.energy.audit.model.entity.template.TplTagMapping;
+import com.energy.audit.model.entity.template.TplTemplateVersion;
 import com.energy.audit.service.template.SpreadsheetDataExtractor;
 import com.energy.audit.service.template.SubmissionService;
 import com.energy.audit.service.template.TagMappingService;
+import com.energy.audit.service.template.TemplateVersionService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
@@ -23,15 +25,18 @@ public class SubmissionServiceImpl implements SubmissionService {
     private final TplSubmissionMapper submissionMapper;
     private final TagMappingService tagMappingService;
     private final SpreadsheetDataExtractor dataExtractor;
+    private final TemplateVersionService versionService;
     private final ObjectMapper objectMapper;
 
     public SubmissionServiceImpl(TplSubmissionMapper submissionMapper,
                                  TagMappingService tagMappingService,
                                  SpreadsheetDataExtractor dataExtractor,
+                                 TemplateVersionService versionService,
                                  ObjectMapper objectMapper) {
         this.submissionMapper = submissionMapper;
         this.tagMappingService = tagMappingService;
         this.dataExtractor = dataExtractor;
+        this.versionService = versionService;
         this.objectMapper = objectMapper;
     }
 
@@ -39,6 +44,9 @@ public class SubmissionServiceImpl implements SubmissionService {
     @Transactional
     public TplSubmission saveDraft(Long enterpriseId, Long templateId, Integer auditYear,
                                    String submissionJson, Integer templateVersion) {
+        // M-4: validate JSON format before persisting
+        validateJson(submissionJson);
+
         String operator = SecurityUtils.getRequiredCurrentUsername();
         TplSubmission existing = submissionMapper.selectByEnterpriseTemplateYear(
                 enterpriseId, templateId, auditYear);
@@ -69,7 +77,6 @@ public class SubmissionServiceImpl implements SubmissionService {
     @Transactional
     public void submit(Long submissionId, Long templateVersionId) {
         Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
-        // Tenant-scoped lookup: throws BusinessException when submission belongs to another enterprise
         TplSubmission sub = submissionMapper.selectByIdAndEnterprise(submissionId, enterpriseId);
         if (sub == null) {
             throw new BusinessException("填报记录不存在或无权操作: " + submissionId);
@@ -77,6 +84,14 @@ public class SubmissionServiceImpl implements SubmissionService {
         if (sub.getStatus() == 1) {
             throw new BusinessException("该填报已提交，请勿重复提交");
         }
+
+        // M-3: validate that the supplied templateVersionId belongs to the same template
+        // as this submission — prevents data extraction with a mismatched mapping set
+        TplTemplateVersion version = versionService.getById(templateVersionId);
+        if (!version.getTemplateId().equals(sub.getTemplateId())) {
+            throw new BusinessException("模板版本与填报记录不匹配");
+        }
+
         List<TplTagMapping> mappings = tagMappingService.listByVersionId(templateVersionId);
         Map<String, Object> extracted = dataExtractor.extractData(sub.getSubmissionJson(), mappings);
         String extractedJson;
@@ -112,5 +127,17 @@ public class SubmissionServiceImpl implements SubmissionService {
             throw new BusinessException("填报记录不存在: " + id);
         }
         return sub;
+    }
+
+    /** M-4: ensure submissionJson is well-formed JSON before persisting */
+    private void validateJson(String submissionJson) {
+        if (submissionJson == null || submissionJson.isBlank()) {
+            throw new BusinessException("填报数据不能为空");
+        }
+        try {
+            objectMapper.readTree(submissionJson);
+        } catch (JsonProcessingException e) {
+            throw new BusinessException("填报数据 JSON 格式无效: " + e.getOriginalMessage());
+        }
     }
 }
