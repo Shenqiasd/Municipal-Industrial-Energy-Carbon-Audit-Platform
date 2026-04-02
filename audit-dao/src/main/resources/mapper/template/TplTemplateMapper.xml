@@ -11,7 +11,6 @@
         <result column="description"      property="description"/>
         <result column="current_version"  property="currentVersion"/>
         <result column="status"           property="status"/>
-        <result column="remark"           property="remark"/>
         <result column="create_by"        property="createBy"/>
         <result column="create_time"      property="createTime"/>
         <result column="update_by"        property="updateBy"/>
@@ -20,7 +19,7 @@
     </resultMap>
 
     <sql id="Base_Column_List">
-        id, template_code, template_name, module_type, description, current_version, status, remark,
+        id, template_code, template_name, module_type, description, current_version, status,
         create_by, create_time, update_by, update_time, deleted
     </sql>
 
@@ -54,10 +53,10 @@
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO tpl_template (
-            template_code, template_name, module_type, description, current_version, status, remark,
+            template_code, template_name, module_type, description, current_version, status,
             create_by, create_time, update_by, update_time, deleted
         ) VALUES (
-            #{templateCode}, #{templateName}, #{moduleType}, #{description}, #{currentVersion}, #{status}, #{remark},
+            #{templateCode}, #{templateName}, #{moduleType}, #{description}, #{currentVersion}, #{status},
             #{createBy}, NOW(), #{updateBy}, NOW(), 0
         )
     </insert>
@@ -72,7 +71,6 @@
             <if test="description != null">description = #{description},</if>
             <if test="currentVersion != null">current_version = #{currentVersion},</if>
             <if test="status != null">status = #{status},</if>
-            <if test="remark != null">remark = #{remark},</if>
         </set>
         WHERE id = #{id} AND deleted = 0
     </update>

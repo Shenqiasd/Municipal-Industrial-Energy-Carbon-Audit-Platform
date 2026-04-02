@@ -33,7 +33,4 @@ public class TplTemplate extends BaseEntity {
 
     /** Status (0=draft, 1=published, 2=archived) */
     private Integer status;
-
-    /** Remark */
-    private String remark;
 }
