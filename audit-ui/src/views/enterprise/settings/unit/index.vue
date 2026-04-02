@@ -39,7 +39,7 @@ const rules = {
 }
 
 const currentTabType = computed(() => Number(activeTab.value))
-const isEndUse = computed(() => currentTabType.value === 3)
+const isEndUse = computed(() => (dialogVisible.value ? form.value.unitType === 3 : currentTabType.value === 3))
 
 const energyOptions = ref<BsEnergy[]>([])
 const endUseCategoryOptions = ref<DictData[]>([])
@@ -76,6 +76,9 @@ async function loadEndUseCategoryOptions() {
 function onTabChange() {
   query.value.pageNum = 1
   expandedUnitEnergies.value = {}
+  selectedAddEnergy.value = {}
+  addingEnergy.value = {}
+  loadingEnergies.value = {}
   loadData()
 }
 
