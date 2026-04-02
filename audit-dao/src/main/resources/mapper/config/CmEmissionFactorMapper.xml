@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.energy.audit.dao.mapper.config.CmEmissionFactorMapper">
+
+    <resultMap id="BaseResultMap" type="com.energy.audit.model.entity.config.CmEmissionFactor">
+        <id     column="id"               property="id"/>
+        <result column="factor_name"      property="factorName"/>
+        <result column="energy_type"      property="energyType"/>
+        <result column="factor_value"     property="factorValue"/>
+        <result column="measurement_unit" property="measurementUnit"/>
+        <result column="source"           property="source"/>
+        <result column="effective_year"   property="effectiveYear"/>
+        <result column="status"           property="status"/>
+        <result column="remark"           property="remark"/>
+        <result column="create_by"        property="createBy"/>
+        <result column="create_time"      property="createTime"/>
+        <result column="update_by"        property="updateBy"/>
+        <result column="update_time"      property="updateTime"/>
+        <result column="deleted"          property="deleted"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, factor_name, energy_type, factor_value, measurement_unit, source, effective_year,
+        status, remark, create_by, create_time, update_by, update_time, deleted
+    </sql>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM cm_emission_factor
+        WHERE id = #{id} AND deleted = 0
+    </select>
+
+    <select id="selectList" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM cm_emission_factor
+        WHERE deleted = 0
+        <if test="factorName != null and factorName != ''">
+            AND factor_name LIKE CONCAT('%', #{factorName}, '%')
+        </if>
+        <if test="energyType != null and energyType != ''">
+            AND energy_type = #{energyType}
+        </if>
+        <if test="effectiveYear != null">
+            AND effective_year = #{effectiveYear}
+        </if>
+        <if test="status != null">
+            AND status = #{status}
+        </if>
+        ORDER BY effective_year DESC, energy_type, id
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cm_emission_factor (
+            factor_name, energy_type, factor_value, measurement_unit, source, effective_year,
+            status, remark, create_by, create_time, update_by, update_time, deleted
+        ) VALUES (
+            #{factorName}, #{energyType}, #{factorValue}, #{measurementUnit}, #{source}, #{effectiveYear},
+            #{status}, #{remark}, #{createBy}, NOW(), #{updateBy}, NOW(), 0
+        )
+    </insert>
+
+    <update id="updateById">
+        UPDATE cm_emission_factor
+        <set>
+            update_time = NOW(),
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="factorName != null">factor_name = #{factorName},</if>
+            <if test="energyType != null">energy_type = #{energyType},</if>
+            <if test="factorValue != null">factor_value = #{factorValue},</if>
+            <if test="measurementUnit != null">measurement_unit = #{measurementUnit},</if>
+            <if test="source != null">source = #{source},</if>
+            <if test="effectiveYear != null">effective_year = #{effectiveYear},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </set>
+        WHERE id = #{id} AND deleted = 0
+    </update>
+
+    <update id="deleteById">
+        UPDATE cm_emission_factor
+        SET deleted = 1, update_by = #{updateBy}, update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+</mapper>

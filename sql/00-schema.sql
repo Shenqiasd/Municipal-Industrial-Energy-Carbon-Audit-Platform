@@ -325,6 +325,33 @@ CREATE TABLE `ent_enterprise_setting` (
 -- ============================================================================
 
 -- ----------------------------
+-- 3.0 全局能源目录表 (管理端维护，企业可从此导入)
+-- ----------------------------
+DROP TABLE IF EXISTS `bs_energy_catalog`;
+CREATE TABLE `bs_energy_catalog` (
+    `id`               BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `name`             VARCHAR(128)  NOT NULL                COMMENT '名称',
+    `category`         VARCHAR(64)   DEFAULT NULL            COMMENT '类别(字典: energy_category)',
+    `measurement_unit` VARCHAR(32)   DEFAULT NULL            COMMENT '计量单位',
+    `equivalent_value` DECIMAL(18,6) DEFAULT NULL            COMMENT '当量值',
+    `equal_value`      DECIMAL(18,6) DEFAULT NULL            COMMENT '等价值',
+    `low_heat_value`   DECIMAL(18,6) DEFAULT NULL            COMMENT '低位热值',
+    `carbon_content`   DECIMAL(18,6) DEFAULT NULL            COMMENT '碳含量',
+    `oxidation_rate`   DECIMAL(18,6) DEFAULT NULL            COMMENT '氧化率',
+    `color`            VARCHAR(16)   DEFAULT NULL            COMMENT '显示颜色',
+    `is_active`        TINYINT       DEFAULT 1               COMMENT '是否启用(0否 1是)',
+    `sort_order`       INT           DEFAULT 0               COMMENT '排序',
+    `remark`           VARCHAR(512)  DEFAULT NULL            COMMENT '备注',
+    `create_by`        VARCHAR(64)   DEFAULT NULL            COMMENT '创建人',
+    `create_time`      DATETIME      DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_by`        VARCHAR(64)   DEFAULT NULL            COMMENT '更新人',
+    `update_time`      DATETIME      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `deleted`          TINYINT       DEFAULT 0               COMMENT '逻辑删除(0未删除 1已删除)',
+    PRIMARY KEY (`id`),
+    INDEX `idx_category` (`category`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='全局能源目录表(管理端维护)';
+
+-- ----------------------------
 -- 3.1 能源品种表 (3.2)
 -- ----------------------------
 DROP TABLE IF EXISTS `bs_energy`;

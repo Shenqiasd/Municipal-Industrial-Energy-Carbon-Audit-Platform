@@ -23,7 +23,7 @@ import java.util.List;
 /**
  * Energy setting controller
  */
-@Tag(name = "Energy Settings", description = "Energy type CRUD operations")
+@Tag(name = "Energy Settings", description = "Enterprise energy type CRUD and catalog import")
 @RestController
 @RequestMapping("/setting/energy")
 public class EnergySettingController {
@@ -70,6 +70,13 @@ public class EnergySettingController {
     @DeleteMapping("/{id}")
     public R<Void> delete(@PathVariable Long id) {
         energySettingService.delete(id);
+        return R.ok();
+    }
+
+    @Operation(summary = "Import energy types from global catalog")
+    @PostMapping("/import-catalog")
+    public R<Void> importFromCatalog(@RequestBody List<Long> catalogIds) {
+        energySettingService.importFromCatalog(catalogIds);
         return R.ok();
     }
 }
