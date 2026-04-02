@@ -29,14 +29,14 @@ public class EnterpriseSettingController {
     @Operation(summary = "Get own enterprise setting")
     @GetMapping
     public R<EntEnterpriseSetting> get() {
-        Long enterpriseId = SecurityUtils.getCurrentEnterpriseId();
+        Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
         return R.ok(settingService.get(enterpriseId));
     }
 
     @Operation(summary = "Save (upsert) own enterprise setting")
     @PutMapping
     public R<Void> save(@RequestBody EntEnterpriseSetting setting) {
-        Long enterpriseId = SecurityUtils.getCurrentEnterpriseId();
+        Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
         setting.setEnterpriseId(enterpriseId);
         settingService.save(setting);
         return R.ok();
