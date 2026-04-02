@@ -27,13 +27,13 @@
 
     <update id="deleteByUnitIdAndEnergyId">
         UPDATE bs_unit_energy
-        SET deleted = 1, update_time = NOW()
+        SET deleted = 1, update_by = #{updateBy}, update_time = NOW()
         WHERE unit_id = #{unitId} AND energy_id = #{energyId} AND deleted = 0
     </update>
 
     <update id="deleteAllByUnitId">
         UPDATE bs_unit_energy
-        SET deleted = 1, update_time = NOW()
+        SET deleted = 1, update_by = #{updateBy}, update_time = NOW()
         WHERE unit_id = #{unitId} AND deleted = 0
     </update>
 

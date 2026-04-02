@@ -2,6 +2,7 @@ package com.energy.audit.service.setting.impl;
 
 import com.energy.audit.common.exception.BusinessException;
 import com.energy.audit.common.util.SecurityUtils;
+import com.energy.audit.dao.mapper.setting.BsEnergyMapper;
 import com.energy.audit.dao.mapper.setting.BsUnitEnergyMapper;
 import com.energy.audit.dao.mapper.setting.BsUnitMapper;
 import com.energy.audit.model.entity.setting.BsUnit;
@@ -20,10 +21,14 @@ public class UnitSettingServiceImpl implements UnitSettingService {
 
     private final BsUnitMapper unitMapper;
     private final BsUnitEnergyMapper unitEnergyMapper;
+    private final BsEnergyMapper energyMapper;
 
-    public UnitSettingServiceImpl(BsUnitMapper unitMapper, BsUnitEnergyMapper unitEnergyMapper) {
+    public UnitSettingServiceImpl(BsUnitMapper unitMapper,
+                                   BsUnitEnergyMapper unitEnergyMapper,
+                                   BsEnergyMapper energyMapper) {
         this.unitMapper = unitMapper;
         this.unitEnergyMapper = unitEnergyMapper;
+        this.energyMapper = energyMapper;
     }
 
     @Override
@@ -64,9 +69,12 @@ public class UnitSettingServiceImpl implements UnitSettingService {
     }
 
     @Override
+    @Transactional
     public void delete(Long id) {
         getById(id);
-        unitMapper.deleteById(id, SecurityUtils.getCurrentUsername());
+        String operator = SecurityUtils.getCurrentUsername();
+        unitMapper.deleteById(id, operator);
+        unitEnergyMapper.deleteAllByUnitId(id, operator);
     }
 
     @Override
@@ -77,6 +85,10 @@ public class UnitSettingServiceImpl implements UnitSettingService {
     @Override
     @Transactional
     public void addUnitEnergy(Long unitId, Long energyId) {
+        getById(unitId);
+        if (energyMapper.selectById(energyId) == null) {
+            throw new BusinessException("Energy not found: " + energyId);
+        }
         String operator = SecurityUtils.getCurrentUsername();
         BsUnitEnergy ue = new BsUnitEnergy();
         ue.setUnitId(unitId);
@@ -89,6 +101,6 @@ public class UnitSettingServiceImpl implements UnitSettingService {
     @Override
     @Transactional
     public void removeUnitEnergy(Long unitId, Long energyId) {
-        unitEnergyMapper.deleteByUnitIdAndEnergyId(unitId, energyId);
+        unitEnergyMapper.deleteByUnitIdAndEnergyId(unitId, energyId, SecurityUtils.getCurrentUsername());
     }
 }

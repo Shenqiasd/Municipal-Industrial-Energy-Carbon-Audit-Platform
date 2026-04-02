@@ -16,7 +16,8 @@ public interface BsUnitEnergyMapper {
 
     int insert(BsUnitEnergy unitEnergy);
 
-    int deleteByUnitIdAndEnergyId(@Param("unitId") Long unitId, @Param("energyId") Long energyId);
+    int deleteByUnitIdAndEnergyId(@Param("unitId") Long unitId, @Param("energyId") Long energyId,
+                                   @Param("updateBy") String updateBy);
 
-    int deleteAllByUnitId(@Param("unitId") Long unitId);
+    int deleteAllByUnitId(@Param("unitId") Long unitId, @Param("updateBy") String updateBy);
 }

@@ -311,6 +311,7 @@ CREATE TABLE `ent_enterprise_setting` (
     `superior_department`   VARCHAR(256) DEFAULT NULL            COMMENT '上级主管部门(字典)',
     `unit_nature`           VARCHAR(64)  DEFAULT NULL            COMMENT '单位性质(字典)',
     `energy_enterprise_type` VARCHAR(64) DEFAULT NULL            COMMENT '用能企业类型(字典)',
+    `remark`                VARCHAR(512) DEFAULT NULL            COMMENT '备注',
     `create_by`             VARCHAR(64)  DEFAULT NULL            COMMENT '创建人',
     `create_time`           DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_by`             VARCHAR(64)  DEFAULT NULL            COMMENT '更新人',
