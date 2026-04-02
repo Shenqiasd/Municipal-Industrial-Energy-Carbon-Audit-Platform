@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Edit, Delete, Search, Refresh } from '@element-plus/icons-vue'
+import { Plus, Edit, Delete } from '@element-plus/icons-vue'
 import {
   getUnitList,
   createUnit,
@@ -16,11 +16,17 @@ import {
   type BsEnergy,
 } from '@/api/setting'
 
+const TABS = [
+  { label: '加工转换', unitType: 1 },
+  { label: '分配输送', unitType: 2 },
+  { label: '终端使用', unitType: 3 },
+]
+
+const activeTab = ref('1')
 const loading = ref(false)
 const tableData = ref<BsUnit[]>([])
 const total = ref(0)
-
-const query = ref({ name: '', pageNum: 1, pageSize: 15 })
+const query = ref({ pageNum: 1, pageSize: 20 })
 
 const dialogVisible = ref(false)
 const dialogTitle = ref('')
@@ -29,27 +35,21 @@ const formRef = ref()
 const form = ref<Partial<BsUnit>>({})
 const rules = {
   name: [{ required: true, message: '请输入单元名称', trigger: 'blur' }],
-  unitType: [{ required: true, message: '请选择单元类型', trigger: 'change' }],
 }
 
-const UNIT_TYPE_OPTIONS = [
-  { label: '主要生产单元', value: 1 },
-  { label: '辅助生产单元', value: 2 },
-  { label: '附属生产单元', value: 3 },
-  { label: '非生产单元', value: 4 },
-]
+const currentTabType = computed(() => Number(activeTab.value))
+const isEndUse = computed(() => currentTabType.value === 3)
 
-const energyDrawerVisible = ref(false)
-const currentUnit = ref<BsUnit | null>(null)
-const unitEnergies = ref<BsUnitEnergy[]>([])
 const energyOptions = ref<BsEnergy[]>([])
-const addingEnergy = ref(false)
-const selectedAddEnergy = ref<number | null>(null)
+const expandedUnitEnergies = ref<Record<number, BsUnitEnergy[]>>({})
+const loadingEnergies = ref<Record<number, boolean>>({})
+const selectedAddEnergy = ref<Record<number, number | null>>({})
+const addingEnergy = ref<Record<number, boolean>>({})
 
 async function loadData() {
   loading.value = true
   try {
-    const res = await getUnitList(query.value)
+    const res = await getUnitList({ ...query.value, unitType: currentTabType.value })
     tableData.value = res.rows ?? []
     total.value = Number(res.total ?? 0)
   } finally {
@@ -57,11 +57,19 @@ async function loadData() {
   }
 }
 
-function handleSearch() { query.value.pageNum = 1; loadData() }
-function handleReset() { query.value = { name: '', pageNum: 1, pageSize: 15 }; loadData() }
+async function loadEnergyOptions() {
+  const res = await getEnergyList({ pageSize: 500 })
+  energyOptions.value = res.rows ?? []
+}
+
+function onTabChange() {
+  query.value.pageNum = 1
+  expandedUnitEnergies.value = {}
+  loadData()
+}
 
 function openCreate() {
-  form.value = { unitType: 1 }
+  form.value = { unitType: currentTabType.value }
   dialogTitle.value = '新增用能单元'
   dialogVisible.value = true
 }
@@ -101,98 +109,161 @@ async function handleDelete(row: BsUnit) {
   loadData()
 }
 
-async function openEnergyDrawer(row: BsUnit) {
-  currentUnit.value = row
-  energyDrawerVisible.value = true
-  selectedAddEnergy.value = null
-  const [energies, myEnergies] = await Promise.all([
-    getEnergyList({ pageSize: 200 }),
-    getUnitEnergies(row.id!),
-  ])
-  energyOptions.value = energies.rows ?? []
-  unitEnergies.value = myEnergies ?? []
-}
-
-async function handleAddEnergy() {
-  if (!selectedAddEnergy.value || !currentUnit.value) return
-  addingEnergy.value = true
+async function onExpandChange(row: BsUnit, expanded: boolean) {
+  if (!expanded || !row.id) return
+  if (expandedUnitEnergies.value[row.id]) return
+  loadingEnergies.value[row.id] = true
   try {
-    await addUnitEnergy(currentUnit.value.id!, selectedAddEnergy.value)
-    ElMessage.success('关联成功')
-    selectedAddEnergy.value = null
-    unitEnergies.value = await getUnitEnergies(currentUnit.value.id!)
+    expandedUnitEnergies.value[row.id] = await getUnitEnergies(row.id)
   } finally {
-    addingEnergy.value = false
+    loadingEnergies.value[row.id] = false
   }
 }
 
-async function handleRemoveEnergy(energyId: number) {
-  if (!currentUnit.value) return
-  await removeUnitEnergy(currentUnit.value.id!, energyId)
+async function handleAddEnergy(unitId: number) {
+  const energyId = selectedAddEnergy.value[unitId]
+  if (!energyId) return
+  addingEnergy.value[unitId] = true
+  try {
+    await addUnitEnergy(unitId, energyId)
+    ElMessage.success('关联成功')
+    selectedAddEnergy.value[unitId] = null
+    expandedUnitEnergies.value[unitId] = await getUnitEnergies(unitId)
+  } finally {
+    addingEnergy.value[unitId] = false
+  }
+}
+
+async function handleRemoveEnergy(unitId: number, energyId: number) {
+  await removeUnitEnergy(unitId, energyId)
   ElMessage.success('已移除')
-  unitEnergies.value = await getUnitEnergies(currentUnit.value.id!)
+  expandedUnitEnergies.value[unitId] = await getUnitEnergies(unitId)
 }
 
-function getUnitTypeName(val: number) {
-  return UNIT_TYPE_OPTIONS.find(o => o.value === val)?.label ?? val
+function availableEnergies(unitId: number) {
+  const linked = expandedUnitEnergies.value[unitId] ?? []
+  const linkedIds = new Set(linked.map(ue => ue.energyId))
+  return energyOptions.value.filter(e => !linkedIds.has(e.id!))
 }
 
-onMounted(loadData)
+onMounted(async () => {
+  await Promise.all([loadData(), loadEnergyOptions()])
+})
 </script>
 
 <template>
   <div class="page-container">
-    <div class="toolbar">
-      <el-form :model="query" inline>
-        <el-form-item label="单元名称">
-          <el-input v-model="query.name" placeholder="请输入名称" clearable style="width:200px" />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" :icon="Search" @click="handleSearch">查询</el-button>
-          <el-button :icon="Refresh" @click="handleReset">重置</el-button>
-        </el-form-item>
-      </el-form>
-      <el-button type="primary" :icon="Plus" @click="openCreate">新增</el-button>
-    </div>
+    <el-tabs v-model="activeTab" @tab-change="onTabChange" class="unit-tabs">
+      <el-tab-pane
+        v-for="tab in TABS"
+        :key="tab.unitType"
+        :label="tab.label"
+        :name="String(tab.unitType)"
+      >
+        <div class="tab-toolbar">
+          <el-button type="primary" :icon="Plus" @click="openCreate">新增</el-button>
+        </div>
 
-    <el-table v-loading="loading" :data="tableData" border stripe>
-      <el-table-column prop="name" label="单元名称" min-width="160" />
-      <el-table-column prop="unitType" label="单元类型" width="140">
-        <template #default="{ row }">{{ getUnitTypeName(row.unitType) }}</template>
-      </el-table-column>
-      <el-table-column prop="subCategory" label="子类别" width="130" />
-      <el-table-column prop="remark" label="备注" min-width="160" show-overflow-tooltip />
-      <el-table-column label="操作" width="200" fixed="right">
-        <template #default="{ row }">
-          <el-button link type="primary" @click="openEnergyDrawer(row)">能源关联</el-button>
-          <el-button link type="primary" :icon="Edit" @click="openEdit(row)">编辑</el-button>
-          <el-button link type="danger" :icon="Delete" @click="handleDelete(row)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+        <el-table
+          v-loading="loading"
+          :data="tableData"
+          border
+          stripe
+          row-key="id"
+          @expand-change="onExpandChange"
+        >
+          <el-table-column type="expand">
+            <template #default="{ row }">
+              <div class="energy-panel" v-if="row.id">
+                <div class="energy-add-row">
+                  <el-select
+                    v-model="selectedAddEnergy[row.id]"
+                    placeholder="选择能源品种"
+                    filterable
+                    clearable
+                    style="width:240px"
+                  >
+                    <el-option
+                      v-for="e in availableEnergies(row.id)"
+                      :key="e.id"
+                      :label="`${e.name}（${e.measurementUnit ?? '-'}）`"
+                      :value="e.id"
+                    />
+                  </el-select>
+                  <el-button
+                    type="primary"
+                    size="small"
+                    :loading="addingEnergy[row.id]"
+                    @click="handleAddEnergy(row.id)"
+                  >
+                    关联
+                  </el-button>
+                </div>
 
-    <el-pagination
-      v-model:current-page="query.pageNum"
-      v-model:page-size="query.pageSize"
-      :total="total"
-      :page-sizes="[10, 15, 30]"
-      layout="total, sizes, prev, pager, next"
-      style="margin-top:16px"
-      @change="loadData"
-    />
+                <div class="energy-tags" v-if="!loadingEnergies[row.id]">
+                  <template v-if="expandedUnitEnergies[row.id]?.length">
+                    <el-tag
+                      v-for="ue in expandedUnitEnergies[row.id]"
+                      :key="ue.energyId"
+                      closable
+                      size="default"
+                      type="info"
+                      @close="handleRemoveEnergy(row.id, ue.energyId)"
+                      style="margin:4px"
+                    >
+                      {{ ue.energyName ?? `能源#${ue.energyId}` }}
+                      <span v-if="ue.measurementUnit" class="unit-label">（{{ ue.measurementUnit }}）</span>
+                    </el-tag>
+                  </template>
+                  <span v-else class="no-energy">暂未关联能源品种</span>
+                </div>
+                <div v-else class="energy-loading">
+                  <el-icon class="is-loading"><svg viewBox="0 0 1024 1024" width="16" height="16"><path d="M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm0 820c-205.4 0-372-166.6-372-372s166.6-372 372-372 372 166.6 372 372-166.6 372-372 372z" fill="currentColor"/></svg></el-icon>
+                  加载中…
+                </div>
+              </div>
+            </template>
+          </el-table-column>
+
+          <el-table-column prop="name" label="单元名称" min-width="160" />
+          <el-table-column prop="subCategory" label="子类别" width="140" />
+          <el-table-column prop="remark" label="备注" min-width="180" show-overflow-tooltip />
+          <el-table-column label="操作" width="160" fixed="right">
+            <template #default="{ row }">
+              <el-button link type="primary" :icon="Edit" @click="openEdit(row)">编辑</el-button>
+              <el-button link type="danger" :icon="Delete" @click="handleDelete(row)">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <el-pagination
+          v-model:current-page="query.pageNum"
+          v-model:page-size="query.pageSize"
+          :total="total"
+          :page-sizes="[10, 20, 50]"
+          layout="total, sizes, prev, pager, next"
+          style="margin-top:16px"
+          @change="loadData"
+        />
+      </el-tab-pane>
+    </el-tabs>
 
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="500px" @close="handleClose">
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="110px">
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
         <el-form-item label="单元名称" prop="name">
           <el-input v-model="form.name" placeholder="请输入用能单元名称" />
         </el-form-item>
-        <el-form-item label="单元类型" prop="unitType">
-          <el-select v-model="form.unitType" style="width:100%">
-            <el-option v-for="o in UNIT_TYPE_OPTIONS" :key="o.value" :label="o.label" :value="o.value" />
-          </el-select>
-        </el-form-item>
         <el-form-item label="子类别">
-          <el-input v-model="form.subCategory" placeholder="请输入子类别" />
+          <el-input
+            v-if="!isEndUse"
+            v-model="form.subCategory"
+            placeholder="请输入子类别（选填）"
+          />
+          <el-input
+            v-else
+            v-model="form.subCategory"
+            placeholder="请输入终端使用子类别（如：照明/动力/工艺等）"
+          />
         </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="form.remark" type="textarea" :rows="2" />
@@ -203,47 +274,61 @@ onMounted(loadData)
         <el-button type="primary" :loading="submitting" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
-
-    <el-drawer v-model="energyDrawerVisible" :title="`能源关联 — ${currentUnit?.name ?? ''}`" size="480px">
-      <div class="drawer-body">
-        <div class="add-energy-row">
-          <el-select v-model="selectedAddEnergy" placeholder="选择能源品种" filterable clearable style="flex:1">
-            <el-option
-              v-for="e in energyOptions"
-              :key="e.id"
-              :label="e.name"
-              :value="e.id"
-              :disabled="unitEnergies.some(ue => ue.energyId === e.id)"
-            />
-          </el-select>
-          <el-button type="primary" :loading="addingEnergy" @click="handleAddEnergy">关联</el-button>
-        </div>
-        <el-divider />
-        <el-table :data="unitEnergies" border size="small">
-          <el-table-column prop="energyName" label="能源名称" min-width="140" />
-          <el-table-column prop="measurementUnit" label="计量单位" width="100" />
-          <el-table-column label="操作" width="80">
-            <template #default="{ row }">
-              <el-button link type="danger" :icon="Delete" @click="handleRemoveEnergy(row.energyId)">移除</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-        <el-empty v-if="!unitEnergies.length" description="暂未关联能源品种" />
-      </div>
-    </el-drawer>
   </div>
 </template>
 
 <style scoped lang="scss">
-.page-container { padding: 20px; }
-.toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
+.page-container {
+  padding: 20px;
 }
-.drawer-body { padding: 0 4px; }
-.add-energy-row { display: flex; gap: 12px; align-items: center; }
+
+.unit-tabs {
+  :deep(.el-tabs__header) {
+    margin-bottom: 16px;
+  }
+}
+
+.tab-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.energy-panel {
+  padding: 12px 24px 12px 48px;
+  background: #fafafa;
+}
+
+.energy-add-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.energy-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  min-height: 32px;
+}
+
+.no-energy {
+  color: #909399;
+  font-size: 13px;
+}
+
+.energy-loading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #909399;
+  font-size: 13px;
+}
+
+.unit-label {
+  font-size: 11px;
+  color: #606266;
+}
 </style>
