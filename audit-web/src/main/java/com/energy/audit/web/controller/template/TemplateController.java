@@ -204,6 +204,17 @@ public class TemplateController {
         return R.ok(tagMappingService.listByVersionId(versionId));
     }
 
+    @Operation(summary = "从已保存的 templateJson 重新发现并同步 Tag 映射（管理员打开设计器时调用）")
+    @PostMapping("/versions/{versionId}/tags/sync")
+    public R<Void> syncTagsFromJson(@PathVariable Long versionId) {
+        requireAdmin();
+        TplTemplateVersion version = versionService.getById(versionId);
+        if (version.getTemplateJson() != null && !version.getTemplateJson().isBlank()) {
+            tagMappingService.syncFromTemplateJson(versionId, version.getTemplateJson());
+        }
+        return R.ok();
+    }
+
     @Operation(summary = "替换版本的全部标签映射（先删后插）")
     @PutMapping("/versions/{versionId}/tags")
     public R<Void> replaceTags(@PathVariable Long versionId,

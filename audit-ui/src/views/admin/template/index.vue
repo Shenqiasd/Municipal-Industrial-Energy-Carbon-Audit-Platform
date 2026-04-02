@@ -15,6 +15,7 @@ import {
   getVersionById,
   saveVersionJson,
   listTags,
+  syncTagsFromJson,
   replaceTags,
   type TplTemplate,
   type TplTemplateVersion,
@@ -188,6 +189,11 @@ async function openDesigner(v: TplTemplateVersion) {
   try {
     const full = await getVersionById(v.id!)
     designerVersion.value = full
+    // Sync tags from the stored templateJson so the right panel is always
+    // up-to-date, even for versions created before this feature was deployed.
+    if (full.templateJson && full.templateJson !== '{}') {
+      await syncTagsFromJson(v.id!)
+    }
   } finally {
     designerLoading.value = false
   }

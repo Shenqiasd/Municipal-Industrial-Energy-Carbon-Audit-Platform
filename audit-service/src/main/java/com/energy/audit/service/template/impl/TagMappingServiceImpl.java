@@ -5,6 +5,8 @@ import com.energy.audit.dao.mapper.template.TplTagMappingMapper;
 import com.energy.audit.model.entity.template.TplTagMapping;
 import com.energy.audit.service.template.SpreadsheetDataExtractor;
 import com.energy.audit.service.template.TagMappingService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +17,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class TagMappingServiceImpl implements TagMappingService {
+
+    private static final Logger log = LoggerFactory.getLogger(TagMappingServiceImpl.class);
 
     private final TplTagMappingMapper tagMappingMapper;
     private final SpreadsheetDataExtractor extractor;
@@ -51,12 +55,21 @@ public class TagMappingServiceImpl implements TagMappingService {
         String operator = SecurityUtils.getRequiredCurrentUsername();
         Set<String> discoveredTags = extractor.discoverTagNames(templateJson);
 
-        // Load all existing active mappings in one query and index by tagName
-        // to avoid N+1 per-tag lookups.
+        // Load all existing active mappings in one query and index by tagName.
+        // Use merge function to handle any duplicate tagName rows defensively;
+        // in practice the unique-active-tag invariant should be maintained by the schema.
         Map<String, TplTagMapping> existingByTag = tagMappingMapper
                 .selectListByVersionId(versionId)
                 .stream()
-                .collect(Collectors.toMap(TplTagMapping::getTagName, m -> m));
+                .collect(Collectors.toMap(
+                        TplTagMapping::getTagName,
+                        m -> m,
+                        (first, dup) -> {
+                            log.warn("syncFromTemplateJson: duplicate active tag '{}' for versionId={}, keeping first",
+                                    first.getTagName(), versionId);
+                            return first;
+                        }
+                ));
 
         // Insert tags discovered in JSON but absent from DB
         for (String tagName : discoveredTags) {

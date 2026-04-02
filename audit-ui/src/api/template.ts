@@ -128,6 +128,10 @@ export function listTags(versionId: number): Promise<TplTagMapping[]> {
   return request.get(`/template/versions/${versionId}/tags`).then((r: any) => r.data)
 }
 
+export function syncTagsFromJson(versionId: number): Promise<void> {
+  return request.post(`/template/versions/${versionId}/tags/sync`).then(() => undefined)
+}
+
 export function replaceTags(versionId: number, mappings: TplTagMapping[]): Promise<void> {
   return request.put(`/template/versions/${versionId}/tags`, mappings).then(() => undefined)
 }
