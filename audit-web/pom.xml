@@ -47,14 +47,6 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- H2 in-memory database for dev/CI (profile: dev).
-             Production uses MySQL via application-prod.yml. -->
-        <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
-            <scope>runtime</scope>
-        </dependency>
-
         <!-- MySQL driver for production deployments -->
         <dependency>
             <groupId>com.mysql</groupId>
@@ -62,6 +54,24 @@
             <scope>runtime</scope>
         </dependency>
     </dependencies>
+
+    <!-- H2 in-memory DB is activated only for the 'dev' Maven profile.
+         Production builds (no profile or -P prod) do NOT include H2. -->
+    <profiles>
+        <profile>
+            <id>dev</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>com.h2database</groupId>
+                    <artifactId>h2</artifactId>
+                    <scope>runtime</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 
     <build>
         <plugins>

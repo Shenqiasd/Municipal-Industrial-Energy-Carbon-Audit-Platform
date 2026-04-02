@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.energy.audit.dao.mapper.setting.BsProductMapper">
+
+    <resultMap id="BaseResultMap" type="com.energy.audit.model.entity.setting.BsProduct">
+        <id     column="id"              property="id"/>
+        <result column="product_code"    property="productCode"/>
+        <result column="product_name"    property="productName"/>
+        <result column="product_unit"    property="productUnit"/>
+        <result column="industry_code"   property="industryCode"/>
+        <result column="sort_order"      property="sortOrder"/>
+        <result column="status"          property="status"/>
+        <result column="create_time"     property="createTime"/>
+        <result column="update_time"     property="updateTime"/>
+        <result column="is_deleted"      property="isDeleted"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, product_code, product_name, product_unit, industry_code,
+        sort_order, status, create_time, update_time, is_deleted
+    </sql>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM bs_product
+        WHERE id = #{id} AND is_deleted = 0
+    </select>
+
+    <select id="selectByIndustryCode" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM bs_product
+        WHERE industry_code = #{industryCode} AND is_deleted = 0 AND status = 1
+        ORDER BY sort_order
+    </select>
+
+    <select id="selectPage" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM bs_product
+        WHERE is_deleted = 0
+        <if test="productName != null and productName != ''">
+            AND product_name LIKE CONCAT('%', #{productName}, '%')
+        </if>
+        <if test="industryCode != null and industryCode != ''">
+            AND industry_code = #{industryCode}
+        </if>
+        <if test="status != null">
+            AND status = #{status}
+        </if>
+        ORDER BY industry_code, sort_order
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO bs_product (
+            product_code, product_name, product_unit, industry_code,
+            sort_order, status, create_time, update_time, is_deleted
+        ) VALUES (
+            #{productCode}, #{productName}, #{productUnit}, #{industryCode},
+            #{sortOrder}, #{status}, NOW(), NOW(), 0
+        )
+    </insert>
+
+    <update id="updateById">
+        UPDATE bs_product
+        <set>
+            update_time = NOW(),
+            <if test="productName != null">product_name = #{productName},</if>
+            <if test="productUnit != null">product_unit = #{productUnit},</if>
+            <if test="industryCode != null">industry_code = #{industryCode},</if>
+            <if test="sortOrder != null">sort_order = #{sortOrder},</if>
+            <if test="status != null">status = #{status},</if>
+        </set>
+        WHERE id = #{id} AND is_deleted = 0
+    </update>
+
+    <update id="deleteById">
+        UPDATE bs_product SET is_deleted = 1, update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+</mapper>
