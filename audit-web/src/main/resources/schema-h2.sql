@@ -302,6 +302,82 @@ CREATE TABLE IF NOT EXISTS bs_unit_energy (
     UNIQUE KEY uk_unit_energy (unit_id, energy_id)
 );
 
+-- 17. tpl_template_version  (matches TplTemplateVersionMapper.xml + production tpl_template_version)
+CREATE TABLE IF NOT EXISTS tpl_template_version (
+    id            BIGINT       NOT NULL AUTO_INCREMENT,
+    template_id   BIGINT       NOT NULL,
+    version       INT          NOT NULL,
+    template_json CLOB         NOT NULL DEFAULT '{}',
+    change_log    VARCHAR(512),
+    published     TINYINT      DEFAULT 0,
+    publish_time  DATETIME,
+    create_by     VARCHAR(64),
+    create_time   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_by     VARCHAR(64),
+    update_time   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted       TINYINT      NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_template_version (template_id, version)
+);
+
+-- 18. tpl_tag_mapping  (matches TplTagMappingMapper.xml + production tpl_tag_mapping)
+CREATE TABLE IF NOT EXISTS tpl_tag_mapping (
+    id                  BIGINT       NOT NULL AUTO_INCREMENT,
+    template_version_id BIGINT       NOT NULL,
+    tag_name            VARCHAR(128) NOT NULL,
+    field_name          VARCHAR(128) NOT NULL,
+    target_table        VARCHAR(128),
+    data_type           VARCHAR(32),
+    dict_type           VARCHAR(128),
+    required            TINYINT      DEFAULT 0,
+    sheet_index         INT          DEFAULT 0,
+    cell_range          VARCHAR(32),
+    remark              VARCHAR(256),
+    create_by           VARCHAR(64),
+    create_time         DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_by           VARCHAR(64),
+    update_time         DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted             TINYINT      NOT NULL DEFAULT 0,
+    PRIMARY KEY (id)
+);
+
+-- 19. tpl_submission  (matches TplSubmissionMapper.xml + production tpl_submission)
+CREATE TABLE IF NOT EXISTS tpl_submission (
+    id               BIGINT  NOT NULL AUTO_INCREMENT,
+    enterprise_id    BIGINT  NOT NULL,
+    template_id      BIGINT  NOT NULL,
+    template_version INT     NOT NULL,
+    audit_year       INT     NOT NULL,
+    submission_json  CLOB,
+    extracted_data   CLOB,
+    status           TINYINT DEFAULT 0,
+    submit_time      DATETIME,
+    create_by        VARCHAR(64),
+    create_time      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_by        VARCHAR(64),
+    update_time      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted          TINYINT  NOT NULL DEFAULT 0,
+    PRIMARY KEY (id)
+);
+
+-- 20. tpl_edit_lock  (matches TplEditLockMapper.xml + production tpl_edit_lock)
+CREATE TABLE IF NOT EXISTS tpl_edit_lock (
+    id            BIGINT      NOT NULL AUTO_INCREMENT,
+    enterprise_id BIGINT      NOT NULL,
+    template_id   BIGINT      NOT NULL,
+    audit_year    INT         NOT NULL,
+    lock_user_id  BIGINT      NOT NULL,
+    lock_time     DATETIME    NOT NULL,
+    expire_time   DATETIME    NOT NULL,
+    create_by     VARCHAR(64),
+    create_time   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_by     VARCHAR(64),
+    update_time   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted       TINYINT     NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_enterprise_template_year (enterprise_id, template_id, audit_year)
+);
+
 -- 16. sys_operation_log  (matches SysOperationLogMapper.xml + production sys_operation_log)
 CREATE TABLE IF NOT EXISTS sys_operation_log (
     id               BIGINT       NOT NULL AUTO_INCREMENT,

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.energy.audit.dao.mapper.template.TplEditLockMapper">
+
+    <resultMap id="BaseResultMap" type="com.energy.audit.model.entity.template.TplEditLock">
+        <id     column="id"            property="id"/>
+        <result column="enterprise_id" property="enterpriseId"/>
+        <result column="template_id"   property="templateId"/>
+        <result column="audit_year"    property="auditYear"/>
+        <result column="lock_user_id"  property="lockUserId"/>
+        <result column="lock_time"     property="lockTime"/>
+        <result column="expire_time"   property="expireTime"/>
+        <result column="create_by"     property="createBy"/>
+        <result column="create_time"   property="createTime"/>
+        <result column="update_by"     property="updateBy"/>
+        <result column="update_time"   property="updateTime"/>
+        <result column="deleted"       property="deleted"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, enterprise_id, template_id, audit_year, lock_user_id, lock_time, expire_time,
+        create_by, create_time, update_by, update_time, deleted
+    </sql>
+
+    <select id="selectByKey" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM tpl_edit_lock
+        WHERE enterprise_id = #{enterpriseId}
+          AND template_id   = #{templateId}
+          AND audit_year    = #{auditYear}
+          AND deleted = 0
+        LIMIT 1
+    </select>
+
+    <!--
+        UPSERT via ON DUPLICATE KEY UPDATE on uk_enterprise_template_year.
+        If a live (deleted=0) row exists for the same key it is updated in-place;
+        a previously soft-deleted row is treated as a new insert (deleted resets to 0).
+    -->
+    <insert id="insertOrUpdate" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO tpl_edit_lock (
+            enterprise_id, template_id, audit_year, lock_user_id,
+            lock_time, expire_time,
+            create_by, create_time, update_by, update_time, deleted
+        ) VALUES (
+            #{enterpriseId}, #{templateId}, #{auditYear}, #{lockUserId},
+            #{lockTime}, #{expireTime},
+            #{createBy}, NOW(), #{updateBy}, NOW(), 0
+        )
+        ON DUPLICATE KEY UPDATE
+            lock_user_id = VALUES(lock_user_id),
+            lock_time    = VALUES(lock_time),
+            expire_time  = VALUES(expire_time),
+            update_by    = VALUES(update_by),
+            update_time  = NOW(),
+            deleted      = 0
+    </insert>
+
+    <update id="deleteByKey">
+        UPDATE tpl_edit_lock
+        SET deleted = 1, update_by = #{updateBy}, update_time = NOW()
+        WHERE enterprise_id = #{enterpriseId}
+          AND template_id   = #{templateId}
+          AND audit_year    = #{auditYear}
+          AND deleted = 0
+    </update>
+
+</mapper>

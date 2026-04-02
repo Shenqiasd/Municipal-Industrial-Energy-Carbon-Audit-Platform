@@ -46,4 +46,12 @@ public class SecurityUtils {
     public static Long getCurrentEnterpriseId() {
         return ENTERPRISE_ID.get();
     }
+
+    public static Long getRequiredCurrentEnterpriseId() {
+        Long enterpriseId = ENTERPRISE_ID.get();
+        if (enterpriseId == null) {
+            throw new RuntimeException("当前用户不属于任何企业");
+        }
+        return enterpriseId;
+    }
 }
