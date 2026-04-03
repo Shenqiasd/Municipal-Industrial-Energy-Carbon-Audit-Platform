@@ -26,7 +26,7 @@ export interface RegistrationQuery {
 
 export interface PageResult<T> {
   total: number
-  list: T[]
+  rows: T[]
 }
 
 export function getList(params?: RegistrationQuery): Promise<PageResult<Registration>> {

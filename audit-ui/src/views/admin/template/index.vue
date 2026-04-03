@@ -241,6 +241,36 @@ function handleDesignerClose() {
 
 const isReadonly = (v: TplTemplateVersion | null) => v?.published === 1
 
+// ── Direct "设计" shortcut: open latest draft version for a template ──────────
+async function openLatestDesigner(row: TplTemplate) {
+  activeTemplate.value = row
+  const vs = await listVersions(row.id!)
+  let draft = vs.find(v => v.published !== 1)
+  if (!draft && vs.length === 0) {
+    // No versions at all — create one now
+    await createDraftVersion(row.id!)
+    const fresh = await listVersions(row.id!)
+    draft = fresh.find(v => v.published !== 1)
+    if (!draft) { ElMessage.error('创建草稿版本失败，请重试'); return }
+  }
+  if (!draft) {
+    // All existing versions are published; ask before creating a new draft
+    try {
+      await ElMessageBox.confirm(
+        '当前所有版本均已发布，是否自动创建新草稿版本进行设计？',
+        '创建草稿',
+        { type: 'info', confirmButtonText: '创建并设计', cancelButtonText: '取消' }
+      )
+    } catch { return }
+    await createDraftVersion(row.id!)
+    const fresh = await listVersions(row.id!)
+    draft = fresh.find(v => v.published !== 1)
+    if (!draft) { ElMessage.error('创建草稿版本失败，请重试'); return }
+    loadData()
+  }
+  await openDesigner(draft)
+}
+
 onMounted(loadData)
 </script>
 
@@ -300,10 +330,11 @@ onMounted(loadData)
           </template>
         </el-table-column>
         <el-table-column prop="description" label="描述" min-width="160" show-overflow-tooltip />
-        <el-table-column label="操作" width="280" fixed="right">
+        <el-table-column label="操作" width="340" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" :icon="Edit" @click="openEdit(row)">编辑</el-button>
             <el-button link type="success" :icon="Upload" @click="handlePublish(row)" :disabled="row.status === 1">发布</el-button>
+            <el-button link type="warning" @click="openLatestDesigner(row)">设计</el-button>
             <el-button link type="info" :icon="View" @click="openVersions(row)">版本</el-button>
             <el-button link type="danger" :icon="Delete" @click="handleDelete(row)">删除</el-button>
           </template>

@@ -27,7 +27,7 @@ export interface UserQuery {
 
 export interface PageResult<T> {
   total: number
-  list: T[]
+  rows: T[]
 }
 
 export function listUsers(params?: UserQuery): Promise<PageResult<SysUser>> {

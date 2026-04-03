@@ -36,7 +36,7 @@ async function fetchData() {
   loading.value = true
   try {
     const res = await registrationApi.getList(query)
-    tableData.value = res.list
+    tableData.value = res.rows
     total.value = res.total
   } catch {
     // handled by interceptor

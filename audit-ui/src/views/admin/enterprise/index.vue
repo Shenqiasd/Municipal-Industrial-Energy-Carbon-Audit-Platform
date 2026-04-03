@@ -47,7 +47,7 @@ async function fetchData() {
   loading.value = true
   try {
     const res = await enterpriseApi.getList(query)
-    tableData.value = res.list
+    tableData.value = res.rows
     total.value = res.total
   } catch {
     // handled by interceptor

@@ -22,7 +22,7 @@ export interface DictData {
 
 export interface PageResult<T> {
   total: number
-  list: T[]
+  rows: T[]
 }
 
 export interface DictTypeQuery {

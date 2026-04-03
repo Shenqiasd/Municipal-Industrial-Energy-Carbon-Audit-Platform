@@ -46,7 +46,7 @@ async function fetchTypes() {
   typeLoading.value = true
   try {
     const res = await dictApi.listTypes(typeQuery)
-    typeList.value = res.list
+    typeList.value = res.rows
     typeTotal.value = res.total
   } catch {} finally {
     typeLoading.value = false
@@ -107,7 +107,7 @@ async function fetchData() {
   dataLoading.value = true
   try {
     const res = await dictApi.listData({ ...dataQuery, dictType: selectedType.value.dictType })
-    dataList.value = res.list
+    dataList.value = res.rows
     dataTotal.value = res.total
   } catch {} finally {
     dataLoading.value = false
