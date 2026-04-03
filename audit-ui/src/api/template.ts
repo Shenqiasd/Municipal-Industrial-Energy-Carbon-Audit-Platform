@@ -74,77 +74,77 @@ export interface TemplateQuery {
 // ── Template CRUD ──────────────────────────────────────────────────────────────
 
 export function getTemplateList(params?: TemplateQuery): Promise<PageResult<TplTemplate>> {
-  return request.get('/template', { params }).then((r: any) => r.data)
+  return request.get('/template', { params })
 }
 
 export function getTemplateById(id: number): Promise<TplTemplate> {
-  return request.get(`/template/${id}`).then((r: any) => r.data)
+  return request.get(`/template/${id}`)
 }
 
 export function createTemplate(data: Partial<TplTemplate>): Promise<void> {
-  return request.post('/template', data).then(() => undefined)
+  return request.post('/template', data)
 }
 
 export function updateTemplate(id: number, data: Partial<TplTemplate>): Promise<void> {
-  return request.put(`/template/${id}`, data).then(() => undefined)
+  return request.put(`/template/${id}`, data)
 }
 
 export function deleteTemplate(id: number): Promise<void> {
-  return request.delete(`/template/${id}`).then(() => undefined)
+  return request.delete(`/template/${id}`)
 }
 
 export function publishTemplate(id: number): Promise<void> {
-  return request.post(`/template/${id}/publish`).then(() => undefined)
+  return request.post(`/template/${id}/publish`)
 }
 
 // ── Template Versions ──────────────────────────────────────────────────────────
 
 export function listVersions(templateId: number): Promise<TplTemplateVersion[]> {
-  return request.get(`/template/${templateId}/versions`).then((r: any) => r.data)
+  return request.get(`/template/${templateId}/versions`)
 }
 
 export function getPublishedVersion(templateId: number): Promise<TplTemplateVersion | null> {
-  return request.get(`/template/${templateId}/version/published`).then((r: any) => r.data)
+  return request.get(`/template/${templateId}/version/published`)
 }
 
 export function getVersionById(versionId: number): Promise<TplTemplateVersion> {
-  return request.get(`/template/versions/${versionId}`).then((r: any) => r.data)
+  return request.get(`/template/versions/${versionId}`)
 }
 
 export function createDraftVersion(templateId: number): Promise<TplTemplateVersion> {
-  return request.post(`/template/${templateId}/versions`).then((r: any) => r.data)
+  return request.post(`/template/${templateId}/versions`)
 }
 
 export function saveVersionJson(versionId: number, templateJson: string, changeLog?: string): Promise<void> {
-  return request.put(`/template/versions/${versionId}/json`, { templateJson, changeLog }).then(() => undefined)
+  return request.put(`/template/versions/${versionId}/json`, { templateJson, changeLog })
 }
 
 export function publishVersion(templateId: number, versionId: number): Promise<void> {
-  return request.post(`/template/${templateId}/versions/${versionId}/publish`).then(() => undefined)
+  return request.post(`/template/${templateId}/versions/${versionId}/publish`)
 }
 
 // ── Tag Mappings ──────────────────────────────────────────────────────────────
 
 export function listTags(versionId: number): Promise<TplTagMapping[]> {
-  return request.get(`/template/versions/${versionId}/tags`).then((r: any) => r.data)
+  return request.get(`/template/versions/${versionId}/tags`)
 }
 
 export function syncTagsFromJson(versionId: number): Promise<void> {
-  return request.post(`/template/versions/${versionId}/tags/sync`).then(() => undefined)
+  return request.post(`/template/versions/${versionId}/tags/sync`)
 }
 
 export function replaceTags(versionId: number, mappings: TplTagMapping[]): Promise<void> {
-  return request.put(`/template/versions/${versionId}/tags`, mappings).then(() => undefined)
+  return request.put(`/template/versions/${versionId}/tags`, mappings)
 }
 
 // ── Submissions ───────────────────────────────────────────────────────────────
 
 export function getSubmission(templateId: number, auditYear: number): Promise<TplSubmission | null> {
-  return request.get('/template/submission', { params: { templateId, auditYear } }).then((r: any) => r.data)
+  return request.get('/template/submission', { params: { templateId, auditYear } })
 }
 
 export function listSubmissions(): Promise<TplSubmission[]> {
-  return request.get('/template/submissions').then((r: any) => r.data)
+  return request.get('/template/submissions')
 }
 
 export function saveDraft(params: {
@@ -153,29 +153,29 @@ export function saveDraft(params: {
   submissionJson: string
   templateVersion: number
 }): Promise<TplSubmission> {
-  return request.post('/template/submission/draft', params).then((r: any) => r.data)
+  return request.post('/template/submission/draft', params)
 }
 
 export function submitSubmission(submissionId: number, templateVersionId: number): Promise<void> {
   return request.post(`/template/submission/${submissionId}/submit`, null, {
     params: { templateVersionId },
-  }).then(() => undefined)
+  })
 }
 
 // ── Edit Lock ─────────────────────────────────────────────────────────────────
 
 export function acquireLock(templateId: number, auditYear: number): Promise<TplEditLock> {
-  return request.post('/template/lock', null, { params: { templateId, auditYear } }).then((r: any) => r.data)
+  return request.post('/template/lock', null, { params: { templateId, auditYear } })
 }
 
 export function releaseLock(templateId: number, auditYear: number): Promise<void> {
-  return request.delete('/template/lock', { params: { templateId, auditYear } }).then(() => undefined)
+  return request.delete('/template/lock', { params: { templateId, auditYear } })
 }
 
 export function checkLock(templateId: number, auditYear: number): Promise<TplEditLock | null> {
-  return request.get('/template/lock', { params: { templateId, auditYear } }).then((r: any) => r.data)
+  return request.get('/template/lock', { params: { templateId, auditYear } })
 }
 
 export function renewLock(templateId: number, auditYear: number): Promise<TplEditLock> {
-  return request.put('/template/lock', null, { params: { templateId, auditYear } }).then((r: any) => r.data)
+  return request.put('/template/lock', null, { params: { templateId, auditYear } })
 }
