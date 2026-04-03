@@ -130,6 +130,42 @@ const COL_LABELS: Record<string, string> = {
   saving_amount: '节约量',
 }
 
+const NUMERIC_COLS = new Set([
+  'fulltime_staff_count', 'parttime_staff_count', 'five_year_target_value',
+  'indicator_year', 'gross_output', 'sales_revenue', 'tax_paid',
+  'energy_total_cost', 'production_cost', 'energy_cost_ratio',
+  'total_energy_equiv', 'total_energy_equal', 'total_energy_excl_material',
+  'unit_output_energy_equiv', 'unit_output_energy_equal',
+  'saving_project_count', 'saving_invest_total', 'saving_capacity',
+  'saving_benefit', 'coal_target', 'coal_actual',
+  'opening_stock', 'purchase_total', 'purchase_from_province', 'purchase_amount',
+  'industrial_consumption', 'material_consumption', 'transport_consumption',
+  'closing_stock', 'external_supply', 'equiv_factor', 'equal_factor', 'standard_coal',
+  'conversion_input_total', 'conv_power_gen', 'conv_heating', 'conv_coal_washing',
+  'conv_coking', 'conv_refining', 'conv_gas_making', 'conv_lng', 'conv_coal_product',
+  'conversion_output', 'conversion_output_std', 'recovery_utilization',
+  'conversion_factor', 'current_indicator', 'current_numerator', 'current_denominator',
+  'previous_indicator', 'previous_numerator', 'previous_denominator',
+  'quantity', 'annual_runtime_hours', 'annual_energy',
+  'emission_factor', 'activity_data', 'co2_emission', 'energy_value',
+  'physical_quantity', 'standard_quantity', 'seq_no',
+  'decline_rate', 'indicator_value', 'actual_value',
+  'energy_control_total', 'product_unit_consumption', 'saving_amount',
+  'energy_equiv', 'energy_equal', 'unit_energy_equiv', 'unit_energy_equal',
+])
+
+function isNumericCol(col: string): boolean {
+  return NUMERIC_COLS.has(col)
+}
+
+function formatCellValue(value: unknown, col: string): string {
+  if (value == null || value === '') return '—'
+  if (!isNumericCol(col)) return String(value)
+  const num = Number(value)
+  if (isNaN(num)) return String(value)
+  return num.toLocaleString('zh-CN', { maximumFractionDigits: 6 })
+}
+
 function getColLabel(col: string): string {
   return COL_LABELS[col] || col.replace(/_/g, ' ')
 }
@@ -251,6 +287,8 @@ onMounted(() => {
           :label="getColLabel(col)"
           min-width="130"
           show-overflow-tooltip
+          :align="isNumericCol(col) ? 'right' : 'left'"
+          :formatter="(_row: any, _column: any, cellValue: any) => formatCellValue(cellValue, col)"
         />
         <template #empty>
           <el-empty description="暂无数据" :image-size="60" />
