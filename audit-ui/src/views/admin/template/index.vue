@@ -245,13 +245,30 @@ const isReadonly = (v: TplTemplateVersion | null) => v?.published === 1
 async function openLatestDesigner(row: TplTemplate) {
   activeTemplate.value = row
   const vs = await listVersions(row.id!)
-  // Prefer the latest draft; fall back to the latest version if no draft exists
-  const target = vs.find(v => v.published !== 1) ?? vs[0]
-  if (!target) {
-    ElMessage.warning('该模板暂无版本，请先在「版本」中创建草稿')
-    return
+  let draft = vs.find(v => v.published !== 1)
+  if (!draft && vs.length === 0) {
+    // No versions at all — create one now
+    await createDraftVersion(row.id!)
+    const fresh = await listVersions(row.id!)
+    draft = fresh.find(v => v.published !== 1)
+    if (!draft) { ElMessage.error('创建草稿版本失败，请重试'); return }
   }
-  await openDesigner(target)
+  if (!draft) {
+    // All existing versions are published; ask before creating a new draft
+    try {
+      await ElMessageBox.confirm(
+        '当前所有版本均已发布，是否自动创建新草稿版本进行设计？',
+        '创建草稿',
+        { type: 'info', confirmButtonText: '创建并设计', cancelButtonText: '取消' }
+      )
+    } catch { return }
+    await createDraftVersion(row.id!)
+    const fresh = await listVersions(row.id!)
+    draft = fresh.find(v => v.published !== 1)
+    if (!draft) { ElMessage.error('创建草稿版本失败，请重试'); return }
+    loadData()
+  }
+  await openDesigner(draft)
 }
 
 onMounted(loadData)
