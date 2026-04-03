@@ -1,6 +1,6 @@
 /**
  * Minimal TypeScript declarations for GrapeCity SpreadJS loaded via CDN.
- * Only the surface used by SpreadDesigner is typed here.
+ * Supports both V17 (Designer.Designer pattern) and V18 (Designer as constructor).
  *
  * This file is a module (contains export {}), so all interfaces are explicitly
  * exported for use in other files. The Window augmentation is in declare global.
@@ -44,18 +44,14 @@ export interface GCSpreadDesignerConstructor {
   DefaultConfig: object
 }
 
-export interface GCSpreadDesignerNS {
-  Designer: GCSpreadDesignerConstructor
-  DefaultConfig: object
-}
-
 export interface GCSpreadSheetsWorkbookConstructor {
   new (host: HTMLElement, options?: object): GCSpreadWorkbook
 }
 
 export interface GCSpreadSheets {
   Workbook: GCSpreadSheetsWorkbookConstructor
-  Designer: GCSpreadDesignerNS
+  Designer: GCSpreadDesignerConstructor | { Designer: GCSpreadDesignerConstructor; DefaultConfig: object }
+  LicenseKey: string
 }
 
 export interface GCSpread {
