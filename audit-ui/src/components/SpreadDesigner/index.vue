@@ -26,7 +26,8 @@ let designer: GCSpreadDesigner | null = null
 let workbook: GCSpreadWorkbook | null = null
 
 onMounted(() => {
-  if (!window.GC?.Spread?.Sheets?.Designer?.Designer) {
+  const DesignerCtor = resolveDesignerConstructor()
+  if (!DesignerCtor) {
     gcError.value = true
     console.error('SpreadDesigner: GC.Spread.Sheets.Designer not available — check CDN scripts in index.html')
     return
@@ -41,11 +42,26 @@ onBeforeUnmount(() => {
   workbook = null
 })
 
+function resolveDesignerConstructor(): (GCSpreadDesignerConstructor | null) {
+  const ns = window.GC?.Spread?.Sheets?.Designer as any
+  if (!ns) return null
+  if (typeof ns === 'function') return ns
+  if (typeof ns.Designer === 'function') return ns.Designer
+  return null
+}
+
+function resolveDefaultConfig(): object {
+  const ns = window.GC?.Spread?.Sheets?.Designer as any
+  if (!ns) return {}
+  return ns.DefaultConfig ?? (typeof ns === 'function' ? (ns as any).DefaultConfig : {}) ?? {}
+}
+
 function initDesigner() {
   if (!containerRef.value) return
 
-  const GCDesigner = window.GC.Spread.Sheets.Designer
-  designer = new GCDesigner.Designer(containerRef.value, GCDesigner.DefaultConfig, null)
+  const DesignerCtor = resolveDesignerConstructor()!
+  const config = resolveDefaultConfig()
+  designer = new DesignerCtor(containerRef.value, config, null)
   workbook = designer.getWorkbook()
 
   if (props.templateJson && props.templateJson !== '{}') {

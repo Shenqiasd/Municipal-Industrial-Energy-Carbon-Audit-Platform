@@ -71,10 +71,13 @@ mvn package -DskipTests -pl audit-web -am   # no -P dev → H2 excluded
 - Backend smoke-tested: login returns JWT, `passwordChanged=false` triggers force-change dialog
 
 ## Key Technologies
-- **SpreadJS v17.0.2**: Excel-like data entry interface
+- **SpreadJS v18.2.5**: Excel-like data entry interface
   - Files served locally from `audit-ui/public/spreadjs/` (CDN cdn.grapecity.com is blocked in Replit)
-  - npm packages: `@grapecity/spread-sheets{,-designer,-designer-resources-en,-io}@17.0.2`
-  - Copied via: `cp node_modules/@grapecity/spread-sheets/dist/*.min.js public/spreadjs/`
+  - npm packages: `@grapecity/spread-sheets{,-designer,-designer-resources-en,-io,-shapes,-charts,-print,-barcode}@18.2.5`
+  - V18 file layout differs from V17: CSS in `styles/`, designer is `designer.all.min.js`
+  - License key stored in `VITE_SPREADJS_LICENSE` env var, initialized via `src/utils/spreadjs-license.ts`
+  - V18 API change: `GC.Spread.Sheets.Designer` is the constructor directly (not `Designer.Designer`)
+  - `SpreadDesigner/index.vue` uses `resolveDesignerConstructor()` to handle both V17 and V18 patterns
 - **AntV X6**: Energy flow diagram visualization
 - **ECharts**: Data dashboards
 - **OnlyOffice**: Online document editing
