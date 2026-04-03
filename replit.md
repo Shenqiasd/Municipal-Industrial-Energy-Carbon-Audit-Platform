@@ -62,7 +62,10 @@ mvn package -DskipTests -pl audit-web -am   # no -P dev → H2 excluded
 - Backend smoke-tested: login returns JWT, `passwordChanged=false` triggers force-change dialog
 
 ## Key Technologies
-- **SpreadJS**: Excel-like data entry interface
+- **SpreadJS v17.0.2**: Excel-like data entry interface
+  - Files served locally from `audit-ui/public/spreadjs/` (CDN cdn.grapecity.com is blocked in Replit)
+  - npm packages: `@grapecity/spread-sheets{,-designer,-designer-resources-en,-io}@17.0.2`
+  - Copied via: `cp node_modules/@grapecity/spread-sheets/dist/*.min.js public/spreadjs/`
 - **AntV X6**: Energy flow diagram visualization
 - **ECharts**: Data dashboards
 - **OnlyOffice**: Online document editing
