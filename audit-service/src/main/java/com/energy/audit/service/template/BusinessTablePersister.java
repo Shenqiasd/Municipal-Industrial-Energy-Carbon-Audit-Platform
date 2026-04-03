@@ -190,7 +190,7 @@ public class BusinessTablePersister {
 
     static String camelToSnake(String camel) {
         if (camel == null) return null;
-        if (camel.contains("_")) return camel;
+        if (camel.contains("_")) return camel.toLowerCase();
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < camel.length(); i++) {
             char c = camel.charAt(i);

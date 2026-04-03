@@ -52,6 +52,11 @@ public class SpreadsheetDataExtractor {
                 if ("TABLE".equalsIgnoreCase(mappingType)) {
                     List<Map<String, Object>> tableData = extractTableData(
                             sheets, sheetNameList, namedRanges, mapping);
+
+                    if (mapping.getRequired() != null && mapping.getRequired() == 1 && tableData.isEmpty()) {
+                        throw new BusinessException("必填表格 [" + mapping.getFieldName() + "] 无有效数据行");
+                    }
+
                     result.put(mapping.getFieldName(), tableData);
                     log.debug("Extracted TABLE: {} tag: {} rows: {}", mapping.getFieldName(), tagName,
                             tableData.size());
@@ -355,7 +360,16 @@ public class SpreadsheetDataExtractor {
     private List<ColumnMapping> parseColumnMappings(String json) {
         if (json == null || json.isBlank()) return List.of();
         try {
-            return objectMapper.readValue(json, new TypeReference<List<ColumnMapping>>() {});
+            List<ColumnMapping> mappings = objectMapper.readValue(json, new TypeReference<List<ColumnMapping>>() {});
+            for (int i = 0; i < mappings.size(); i++) {
+                ColumnMapping cm = mappings.get(i);
+                if (cm.field == null || cm.field.isBlank()) {
+                    throw new BusinessException("columnMappings 中第 " + (i + 1) + " 项 (col=" + cm.col + ") 缺少 field 属性");
+                }
+            }
+            return mappings;
+        } catch (BusinessException e) {
+            throw e;
         } catch (Exception e) {
             throw new BusinessException("列映射 JSON 格式无效: " + e.getMessage());
         }

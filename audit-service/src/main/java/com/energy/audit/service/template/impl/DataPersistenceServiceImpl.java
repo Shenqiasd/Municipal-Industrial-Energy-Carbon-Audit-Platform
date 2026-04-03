@@ -119,11 +119,15 @@ public class DataPersistenceServiceImpl implements DataPersistenceService {
                     field.setCreateBy(operator);
                     field.setUpdateBy(operator);
 
+                    String valueStr = value.toString();
                     if (value instanceof Number) {
-                        field.setValueNumber(new BigDecimal(value.toString()));
-                        field.setValueText(value.toString());
+                        field.setValueNumber(new BigDecimal(valueStr));
+                        field.setValueText(valueStr);
                     } else {
-                        field.setValueText(value.toString());
+                        field.setValueText(valueStr);
+                    }
+                    if ("DATE".equalsIgnoreCase(mapping.getDataType())) {
+                        field.setValueDate(valueStr);
                     }
                     fallbackScalars.add(field);
                 }
