@@ -241,6 +241,19 @@ function handleDesignerClose() {
 
 const isReadonly = (v: TplTemplateVersion | null) => v?.published === 1
 
+// ── Direct "设计" shortcut: open latest draft version for a template ──────────
+async function openLatestDesigner(row: TplTemplate) {
+  activeTemplate.value = row
+  const vs = await listVersions(row.id!)
+  // Prefer the latest draft; fall back to the latest version if no draft exists
+  const target = vs.find(v => v.published !== 1) ?? vs[0]
+  if (!target) {
+    ElMessage.warning('该模板暂无版本，请先在「版本」中创建草稿')
+    return
+  }
+  await openDesigner(target)
+}
+
 onMounted(loadData)
 </script>
 
@@ -300,10 +313,11 @@ onMounted(loadData)
           </template>
         </el-table-column>
         <el-table-column prop="description" label="描述" min-width="160" show-overflow-tooltip />
-        <el-table-column label="操作" width="280" fixed="right">
+        <el-table-column label="操作" width="340" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" :icon="Edit" @click="openEdit(row)">编辑</el-button>
             <el-button link type="success" :icon="Upload" @click="handlePublish(row)" :disabled="row.status === 1">发布</el-button>
+            <el-button link type="warning" @click="openLatestDesigner(row)">设计</el-button>
             <el-button link type="info" :icon="View" @click="openVersions(row)">版本</el-button>
             <el-button link type="danger" :icon="Delete" @click="handleDelete(row)">删除</el-button>
           </template>

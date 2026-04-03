@@ -29,7 +29,7 @@
   &__logo-title { font-size: 14px; color: #fff; font-weight: 600; line-height: 1.3; }
   &__logo-sub   { font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 2px; }
 
-  &__menu { flex: 1; padding: 10px 0; overflow-y: auto; }
+  &__menu { flex: 1; min-height: 0; padding: 10px 0; overflow-y: auto; }
 
   &__section {
     padding: 10px 16px 4px;

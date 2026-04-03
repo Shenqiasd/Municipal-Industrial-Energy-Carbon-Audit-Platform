@@ -75,3 +75,25 @@ MERGE INTO sys_user (
 MERGE INTO sys_user_role (id, user_id, role_id, create_by, update_by, deleted)
 KEY (user_id, role_id)
 VALUES (2, 2, 2, 'system', 'system', 0);
+
+-- Seed published template (for enterprise report-input testing in H2 dev env)
+MERGE INTO tpl_template (
+    id, template_name, template_code, module_type, description,
+    status, current_version,
+    create_by, create_time, update_by, update_time, deleted
+) KEY (id) VALUES (
+    1, '2024年度能源审计报告', 'ENERGY_AUDIT_2024', 'energy_audit', '能源审计年度报告填报模板（开发测试用）',
+    1, 1,
+    'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP, 0
+);
+
+-- Seed published template version v1
+MERGE INTO tpl_template_version (
+    id, template_id, version, template_json, change_log,
+    published, publish_time,
+    create_by, create_time, update_by, update_time, deleted
+) KEY (id) VALUES (
+    1, 1, 1, '{}', '初始发布版本',
+    1, CURRENT_TIMESTAMP,
+    'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP, 0
+);
