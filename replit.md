@@ -4,14 +4,12 @@
 
 A comprehensive enterprise-level web application for managing energy consumption data, performing energy audits, and generating regulatory reports for industrial enterprises. Targets three user types: Enterprises, Administrators, and Auditors.
 
-**Core philosophy**: SpreadJS templates define all data collection/calculation logic; software handles main workflow. Data entry is template-driven — no independent CRUD pages for audit data.
-
 ## Architecture
 
 ### Frontend (Vue 3 + Vite)
 - Located in `audit-ui/`
 - Vue 3 + TypeScript + Vite (port 5000)
-- UI Library: Element Plus (theme color `#00897B`)
+- UI Library: Element Plus
 - State Management: Pinia
 - Three portals: admin, auditor, enterprise (each with own Layout and router guards)
 
@@ -48,12 +46,13 @@ npm run dev  # runs on port 5000
 
 ### Backend (dev profile — H2 in-memory)
 ```bash
+# Build with H2 included (-P dev activates H2 profile; -am resolves sibling modules)
 mvn package -DskipTests -pl audit-web -am -P dev
 java -jar audit-web/target/audit-web-1.0.0-SNAPSHOT.jar --spring.profiles.active=dev
 # H2 console available at http://localhost:8080/api/h2-console
 # Seed account: admin / admin123 (userType=1, admin portal)
 
-# Or run directly:
+# Or run directly without packaging (multi-module: install first, then run from module dir):
 mvn install -DskipTests -pl audit-web -am -P dev
 cd audit-web && mvn spring-boot:run -P dev
 ```
@@ -67,8 +66,8 @@ mvn package -DskipTests -pl audit-web -am   # no -P dev → H2 excluded
 - "Start application" workflow: `cd audit-ui && npm run dev` on port 5000
 
 ## Database Schemas
-- **Production**: `sql/` directory — 55+ tables for MySQL 8.0; `sql/02-wave4-data-extraction.sql` adds 12 de_* tables + tpl_tag_mapping ALTER; `sql/03-wave6-schema-expansion.sql` adds 14 new de_* tables + 29 new columns across 6 existing tables
-- **Dev H2**: `audit-web/src/main/resources/schema-h2.sql` (46 tables including 24 de_* business tables + 2 generic)
+- **Production**: `sql/` directory — 55 tables for MySQL 8.0; `sql/02-wave4-data-extraction.sql` adds 12 de_* tables + tpl_tag_mapping ALTER
+- **Dev H2**: `audit-web/src/main/resources/schema-h2.sql` (~32 tables including de_* extraction tables)
 - **Dev seed**: `audit-web/src/main/resources/data-h2.sql` (admin/admin123)
 
 ## Wave 4 — Template-Driven Data Extraction (SCALAR + TABLE Dual Mapping Engine)
@@ -77,11 +76,27 @@ mvn package -DskipTests -pl audit-web -am   # no -P dev → H2 excluded
 - **DiscoveredField DTO**: Auto-detects Named Range (single→SCALAR, multi→TABLE) vs Cell Tag (default SCALAR, manual TABLE)
 - **SpreadsheetDataExtractor**: Supports both SCALAR extraction (cell value) and TABLE extraction (row-by-row with column_mappings)
 - **DataPersistenceService**: Routes extracted data to generic de_submission_field / de_submission_table tables
-- **BusinessTablePersister**: Dynamic SQL with column name whitelist (`^[a-z][a-z0-9_]{0,63}$`), camelToSnake conversion
-- **26 de_* tables**: 24 key business tables (company_overview, tech_indicator, energy_consumption, energy_conversion, product_unit_consumption, equipment_detail, carbon_emission, energy_balance, energy_flow, five_year_target, tech_reform_history, saving_project, product_output, meter_instrument, meter_config_rate, obsolete_equipment, product_energy_cost, saving_calculation, management_policy, saving_potential, management_suggestion, tech_reform_suggestion, rectification, report_text) + 2 generic (de_submission_field, de_submission_table)
+- **12 de_* tables**: 10 key business tables (company_overview, tech_indicator, energy_consumption, energy_conversion, product_unit_consumption, equipment_detail, carbon_emission, energy_balance, energy_flow, five_year_target) + 2 generic (de_submission_field, de_submission_table)
 - **Frontend**: Admin template designer sidebar renamed to "字段映射配置", shows source type badges, mapping type selector, TABLE-specific config panel (cellRange, headerRow, columnMappings JSON, rowKeyColumn)
 
+## Wave 0 — Completed (feat/wave0-complete branch)
+- 6 MyBatis Mapper XML files created in `audit-dao/src/main/resources/mapper/`
+- H2 dev environment: `application-dev.yml`, `schema-h2.sql`, `data-h2.sql`
+- H2 runtime dependency added to `audit-web/pom.xml`
+- `ChangePasswordDialog` wired into all 3 Layout components (auto-shows when `needChangePassword=true`)
+- Backend smoke-tested: login returns JWT, `passwordChanged=false` triggers force-change dialog
+
 ## Key Technologies
+- **SpreadJS v18.2.5**: Excel-like data entry interface
+  - Files served locally from `audit-ui/public/spreadjs/` (CDN cdn.grapecity.com is blocked in Replit)
+  - npm packages: `@grapecity/spread-sheets{,-designer,-designer-resources-en,-io,-shapes,-charts,-print,-barcode}@18.2.5`
+  - V18 file layout differs from V17: CSS in `styles/`, designer is `designer.all.min.js`
+  - License key stored in `VITE_SPREADJS_LICENSE` env var, initialized via `src/utils/spreadjs-license.ts`
+  - V18 API change: `GC.Spread.Sheets.Designer` is the constructor directly (not `Designer.Designer`)
+  - `SpreadDesigner/index.vue` uses `resolveDesignerConstructor()` to handle both V17 and V18 patterns
+- **AntV X6**: Energy flow diagram visualization
+- **ECharts**: Data dashboards
+- **OnlyOffice**: Online document editing
 - **SpreadJS v18.2.5**: Excel-like data entry interface
   - Files served locally from `audit-ui/public/spreadjs/` (CDN cdn.grapecity.com is blocked in Replit)
   - npm packages: `@grapecity/spread-sheets{,-designer,-designer-resources-en,-io,-shapes,-charts,-print,-barcode}@18.2.5`
@@ -109,9 +124,9 @@ mvn package -DskipTests -pl audit-web -am   # no -P dev → H2 excluded
 - `audit-ui/src/components/SpreadDesigner/index.vue` — V18 API compat with resolveDesignerConstructor()
 - `audit-ui/src/utils/spreadjs-license.ts` — centralized SpreadJS license initialization
 - `audit-ui/src/types/spreadjs.d.ts` — SpreadJS TypeScript declarations (V18 shape)
-- `audit-web/src/main/java/com/energy/audit/web/controller/data/ExtractedDataController.java` — extracted data overview API (GET /tables + GET /{tableName}), 24 table labels
+- `audit-web/src/main/java/com/energy/audit/web/controller/data/ExtractedDataController.java` — extracted data overview API (GET /tables + GET /{tableName})
 - `audit-ui/src/api/extracted-data.ts` — frontend API for extracted data queries
-- `audit-ui/src/views/enterprise/data/overview/index.vue` — extracted data overview page with year filter + 24 el-tabs with column labels
+- `audit-ui/src/views/enterprise/data/overview/index.vue` — extracted data overview page with year filter + 10 el-tabs
 - `audit-service/src/main/java/com/energy/audit/service/template/BusinessTablePersister.java` — dynamic business table routing
 - `audit-service/src/main/java/com/energy/audit/service/template/SpreadsheetDataExtractor.java` — SCALAR+TABLE extraction
 - `audit-service/src/main/java/com/energy/audit/service/template/impl/DataPersistenceServiceImpl.java` — dispatch logic
@@ -121,7 +136,6 @@ mvn package -DskipTests -pl audit-web -am   # no -P dev → H2 excluded
 - Static deployment: builds `audit-ui/dist`
 - Build command: `cd audit-ui && npm run build`
 - Production MUST use MySQL — `application-prod.yml` and `docker-compose.yml` are off-limits
-- MySQL migration: `sql/02-wave4-data-extraction.sql` — run against prod before Wave 4 features go live
 
 ## GitHub
 - Remote: `https://github.com/Shenqiasd/Municipal-Industrial-Energy-Carbon-Audit-Platform`

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
-import type { GCSpreadDesigner, GCSpreadDesignerConstructor, GCSpreadWorkbook } from '@/types/spreadjs'
+import type { GCSpreadDesigner, GCSpreadWorkbook } from '@/types/spreadjs'
 import { initSpreadJSLicense } from '@/utils/spreadjs-license'
 
 /**
@@ -59,11 +59,10 @@ function resolveDefaultConfig(): object {
 function initDesigner() {
   if (!containerRef.value) return
 
-  const DesignerCtor = resolveDesignerConstructor()
-  if (!DesignerCtor) return
+  const DesignerCtor = resolveDesignerConstructor()!
   const config = resolveDefaultConfig()
   designer = new DesignerCtor(containerRef.value, config, null)
-  workbook = designer!.getWorkbook()
+  workbook = designer.getWorkbook()
 
   if (props.templateJson && props.templateJson !== '{}') {
     try {
