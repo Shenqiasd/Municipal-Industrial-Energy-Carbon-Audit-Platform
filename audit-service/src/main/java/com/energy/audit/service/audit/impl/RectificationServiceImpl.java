@@ -84,8 +84,8 @@ public class RectificationServiceImpl implements RectificationService {
             throw new BusinessException(400, "该整改项已验收完成，不可修改");
         }
 
-        if (status != 1) {
-            throw new BusinessException(400, "企业只能将状态更新为进行中(1)，完成需由审核员验收");
+        if (status != 1 && status != 2) {
+            throw new BusinessException(400, "企业只能将状态更新为进行中(1)或已完成(2)");
         }
 
         AwRectificationTrack update = new AwRectificationTrack();
@@ -93,9 +93,12 @@ public class RectificationServiceImpl implements RectificationService {
         update.setStatus(status);
         update.setResult(result);
         update.setUpdateBy(username);
+        if (status == 2) {
+            update.setCompleteTime(LocalDateTime.now());
+        }
         rectificationMapper.updateById(update);
 
-        String statusLabel = "进行中";
+        String statusLabel = status == 1 ? "进行中" : "已完成";
         addAuditLog(track.getTaskId(), username, "UPDATE_RECTIFICATION",
                 "更新整改项「" + track.getItemName() + "」状态为" + statusLabel);
     }
@@ -107,8 +110,8 @@ public class RectificationServiceImpl implements RectificationService {
         if (track == null) {
             throw new BusinessException(404, "整改项不存在");
         }
-        if (track.getStatus() != 1) {
-            throw new BusinessException(400, "只有进行中的整改项可以验收（企业需先更新为进行中）");
+        if (track.getStatus() != 1 && track.getStatus() != 2) {
+            throw new BusinessException(400, "只有进行中或已完成的整改项可以验收");
         }
 
         AwRectificationTrack update = new AwRectificationTrack();

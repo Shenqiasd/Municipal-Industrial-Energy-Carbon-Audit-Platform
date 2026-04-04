@@ -148,7 +148,7 @@ function onTabChange(tab: string | number) {
 
 async function handleApprove() {
   try {
-    await ElMessageBox.confirm('确认审核通过？', '审核通过', { type: 'success' })
+    await ElMessageBox.confirm('确认审核通过？通过后可添加整改要求。', '审核通过', { type: 'success' })
   } catch { return }
   actionLoading.value = true
   try {
@@ -156,6 +156,7 @@ async function handleApprove() {
     ElMessage.success('审核已通过')
     commentText.value = ''
     loadTask()
+    openRectDialog()
   } catch (e: any) {
     ElMessage.error('操作失败：' + (e?.message ?? ''))
   } finally {
@@ -395,7 +396,7 @@ onMounted(loadTask)
           <el-table-column label="操作" width="80" align="center">
             <template #default="{ row }">
               <el-button
-                v-if="row.status === 1"
+                v-if="row.status === 1 || row.status === 2"
                 link
                 type="success"
                 size="small"

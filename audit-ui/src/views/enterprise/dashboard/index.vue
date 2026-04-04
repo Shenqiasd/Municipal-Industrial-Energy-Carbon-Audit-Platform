@@ -234,12 +234,10 @@ onMounted(loadRectItems)
     <el-dialog v-model="progressDialogVisible" title="更新整改进度" width="450px">
       <el-form label-width="80px">
         <el-form-item label="状态">
-          <el-select v-model="progressForm.status" style="width: 100%" disabled>
+          <el-select v-model="progressForm.status" style="width: 100%">
             <el-option label="进行中" :value="1" />
+            <el-option label="已完成" :value="2" />
           </el-select>
-          <div style="font-size: 12px; color: #909399; margin-top: 4px">
-            整改完成后由审核员验收确认
-          </div>
         </el-form-item>
         <el-form-item label="整改结果">
           <el-input v-model="progressForm.result" type="textarea" :rows="3" placeholder="请描述整改结果..." />
