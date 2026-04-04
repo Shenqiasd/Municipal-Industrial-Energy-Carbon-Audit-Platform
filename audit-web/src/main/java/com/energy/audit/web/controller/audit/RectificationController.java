@@ -171,9 +171,4 @@ public class RectificationController {
             throw new BusinessException(403, "该操作仅审核员可执行");
     }
 
-    private void requireAdmin() {
-        Integer userType = SecurityUtils.getCurrentUserType();
-        if (userType == null || userType != 1)
-            throw new BusinessException(403, "该操作仅管理员可执行");
-    }
 }
