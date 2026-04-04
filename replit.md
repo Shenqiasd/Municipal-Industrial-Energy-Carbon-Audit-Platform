@@ -32,11 +32,12 @@ A comprehensive enterprise-level web application for managing energy consumption
 | Wave 5 | Menu Restructure & Extracted Data Overview | ✅ Completed |
 | Wave 6 | Schema (24 de_* tables) | ✅ Completed |
 | Wave 9.1 | Audit Task Management (3-portal workflow) | ✅ Completed |
+| Wave 9.2 | Rectification Tracking & Overdue Warning | ✅ Completed |
 | Wave 7-8 | Flow Diagram, Charts, Reports | Planned |
 | Wave 10 | Carbon Management & Platform Integration | Partial (emission factor CRUD done) |
 | Wave 11 | Optimization & Testing | Planned |
 
-**Current stage**: Wave 9.1 complete — Audit task management with enterprise submit, admin assign, auditor review/approve/reject across all 3 portals
+**Current stage**: Wave 9.2 complete — Rectification tracking with overdue warning, auditor can create items, enterprise updates progress, daily overdue detection job
 
 ## Wave 9.1 — Audit Task Management
 - **Tables**: `aw_audit_task`, `aw_audit_log` (H2 + MySQL schema)
@@ -48,6 +49,18 @@ A comprehensive enterprise-level web application for managing energy consumption
 - **Frontend API**: `audit-task.ts` with status maps and action labels
 - **Pages**: Enterprise generate/index.vue (submit-audit), admin audit-manage (task list + assign dialog + detail drawer), auditor dashboard/tasks/review
 - **Seed user**: `auditor/admin123` (userType=2, id=3)
+
+## Wave 9.2 — Rectification Tracking & Overdue Warning
+- **Table**: `aw_rectification_track` (H2 + MySQL schema) — status: 0=未启动, 1=进行中, 2=已完成, 3=超期
+- **Entity**: `AwRectificationTrack` with transient `enterpriseName`, `taskTitle`
+- **Mapper**: XML with JOIN queries, `selectOverdueCandidates` for deadline check, `batchUpdateStatus`
+- **Service**: `RectificationServiceImpl` — createItems (batch), updateProgress (enterprise), acceptItem (auditor, status=1 only), markOverdueItems (scheduled)
+- **Controller**: `RectificationController` at `/audit/rectification` — IDOR-safe access control per endpoint
+- **Scheduled Job**: `RectificationOverdueJob` — daily at 01:00, marks overdue items (status 0/1 past deadline → 3)
+- **Frontend API**: `rectification.ts` with status maps
+- **Auditor review**: Added 整改管理 card with table + create dialog (batch add items with name/requirement/deadline) + 验收 button
+- **Enterprise dashboard**: Replaced mock todos with real rectification items from API, with update progress dialog
+- **Admin audit-manage**: Added 超期 column (red badge) + 仅超期 filter checkbox, batch query overdue counts
 - **Security**: Role-based + ownership checks prevent IDOR — auditors can only see/act on assigned tasks
 
 ## Development Setup

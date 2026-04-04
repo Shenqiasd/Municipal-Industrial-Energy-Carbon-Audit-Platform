@@ -12,12 +12,14 @@ import {
 } from '@/api/audit-task'
 import { listUsers, type SysUser } from '@/api/user'
 import { getList as getEnterpriseList, type Enterprise } from '@/api/enterprise'
+import { getOverdueCounts } from '@/api/rectification'
 
 const loading = ref(false)
 const tasks = ref<AuditTask[]>([])
 const filterStatus = ref<number | undefined>(undefined)
 const filterYear = ref<number | undefined>(undefined)
 const filterEnterpriseId = ref<number | undefined>(undefined)
+const filterOverdue = ref(false)
 const enterprises = ref<Enterprise[]>([])
 const yearOptions = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - i)
 
@@ -32,6 +34,8 @@ const currentTask = ref<AuditTask | null>(null)
 const currentLogs = ref<AuditLog[]>([])
 const logsLoading = ref(false)
 
+const overdueMap = ref<Record<number, number>>({})
+
 async function loadTasks() {
   loading.value = true
   try {
@@ -40,10 +44,37 @@ async function loadTasks() {
       auditYear: filterYear.value,
       enterpriseId: filterEnterpriseId.value,
     })
+    loadOverdueCounts()
   } finally {
     loading.value = false
   }
 }
+
+async function loadOverdueCounts() {
+  const ids = tasks.value.map(t => t.id!).filter(Boolean)
+  if (ids.length === 0) {
+    overdueMap.value = {}
+    return
+  }
+  try {
+    overdueMap.value = await getOverdueCounts(ids)
+  } catch {
+    overdueMap.value = {}
+  }
+}
+
+const filteredTasks = ref<AuditTask[]>([])
+
+function applyFilter() {
+  if (filterOverdue.value) {
+    filteredTasks.value = tasks.value.filter(t => (overdueMap.value[t.id!] ?? 0) > 0)
+  } else {
+    filteredTasks.value = tasks.value
+  }
+}
+
+import { watch } from 'vue'
+watch([tasks, overdueMap, filterOverdue], applyFilter, { immediate: true, deep: true })
 
 async function loadEnterprises() {
   try {
@@ -153,12 +184,18 @@ onMounted(() => {
               <el-option label="已退回" :value="3" />
               <el-option label="已完成" :value="4" />
             </el-select>
+            <el-checkbox
+              v-model="filterOverdue"
+              label="仅超期"
+              size="small"
+              style="margin-right:8px"
+            />
             <el-button @click="loadTasks" :loading="loading" size="small">刷新</el-button>
           </div>
         </div>
       </template>
 
-      <el-table v-loading="loading" :data="tasks" border stripe>
+      <el-table v-loading="loading" :data="filteredTasks" border stripe>
         <el-table-column label="企业名称" prop="enterpriseName" min-width="160" />
         <el-table-column label="审计年度" prop="auditYear" width="100" align="center" />
         <el-table-column label="任务标题" prop="taskTitle" min-width="160" />
@@ -167,6 +204,17 @@ onMounted(() => {
             <el-tag :type="statusTag(row.status).type" size="small">
               {{ statusTag(row.status).label }}
             </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="超期" width="80" align="center">
+          <template #default="{ row }">
+            <el-badge
+              v-if="(overdueMap[row.id] ?? 0) > 0"
+              :value="overdueMap[row.id]"
+              type="danger"
+              class="overdue-badge"
+            />
+            <span v-else style="color: #c0c4cc">—</span>
           </template>
         </el-table-column>
         <el-table-column label="审核员" width="120" align="center">
@@ -199,7 +247,6 @@ onMounted(() => {
       </el-table>
     </el-card>
 
-    <!-- Assign Dialog -->
     <el-dialog v-model="assignDialogVisible" title="分配审核员" width="420px">
       <el-form label-width="80px">
         <el-form-item label="审核员">
@@ -219,7 +266,6 @@ onMounted(() => {
       </template>
     </el-dialog>
 
-    <!-- Detail Drawer -->
     <el-drawer v-model="detailDrawerVisible" title="任务详情" size="500px">
       <template v-if="currentTask">
         <el-descriptions :column="1" border size="small" style="margin-bottom: 20px">
@@ -232,6 +278,14 @@ onMounted(() => {
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="审核员">{{ currentTask.assigneeName || '未分配' }}</el-descriptions-item>
+          <el-descriptions-item label="超期整改">
+            <el-badge
+              v-if="(overdueMap[currentTask.id!] ?? 0) > 0"
+              :value="overdueMap[currentTask.id!]"
+              type="danger"
+            />
+            <span v-else>无</span>
+          </el-descriptions-item>
           <el-descriptions-item label="审核结果" v-if="currentTask.result">{{ currentTask.result }}</el-descriptions-item>
           <el-descriptions-item label="创建时间">{{ currentTask.createTime }}</el-descriptions-item>
         </el-descriptions>
@@ -271,5 +325,11 @@ onMounted(() => {
 .header-right {
   display: flex;
   align-items: center;
+}
+.overdue-badge {
+  :deep(.el-badge__content) {
+    position: static;
+    transform: none;
+  }
 }
 </style>

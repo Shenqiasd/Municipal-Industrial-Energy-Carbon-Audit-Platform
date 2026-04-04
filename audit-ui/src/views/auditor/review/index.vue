@@ -20,6 +20,13 @@ import {
   queryExtractedTable,
   type TableSummary,
 } from '@/api/extracted-data'
+import {
+  getRectificationList,
+  createRectificationItems,
+  acceptRectificationItem,
+  RECTIFICATION_STATUS_MAP,
+  type RectificationItem,
+} from '@/api/rectification'
 
 const route = useRoute()
 const router = useRouter()
@@ -38,6 +45,12 @@ const tableLoading = ref(false)
 const commentText = ref('')
 const actionLoading = ref(false)
 
+const rectItems = ref<RectificationItem[]>([])
+const rectLoading = ref(false)
+
+const rectDialogVisible = ref(false)
+const newRectItems = ref<{ itemName: string; requirement: string; deadline: string }[]>([])
+
 const canReview = computed(() => task.value?.status === 1)
 
 async function loadTask() {
@@ -53,6 +66,7 @@ async function loadTask() {
     loadLogs()
     loadTables()
     loadEnterpriseInfo()
+    loadRectItems()
   } catch (e: any) {
     ElMessage.error('加载任务失败：' + (e?.message ?? ''))
     router.push('/auditor/tasks')
@@ -115,6 +129,18 @@ async function loadTableData(tableName: string) {
   }
 }
 
+async function loadRectItems() {
+  if (!task.value?.id) return
+  rectLoading.value = true
+  try {
+    rectItems.value = await getRectificationList(task.value.id)
+  } catch {
+    rectItems.value = []
+  } finally {
+    rectLoading.value = false
+  }
+}
+
 function onTabChange(tab: string | number) {
   activeTab.value = String(tab)
   loadTableData(String(tab))
@@ -150,7 +176,8 @@ async function handleReject() {
     await rejectAuditTask(task.value!.id!, commentText.value)
     ElMessage.success('已退回')
     commentText.value = ''
-    loadTask()
+    rectDialogVisible.value = true
+    addNewRectRow()
   } catch (e: any) {
     ElMessage.error('操作失败：' + (e?.message ?? ''))
   } finally {
@@ -176,13 +203,78 @@ async function handleComment() {
   }
 }
 
+function openRectDialog() {
+  newRectItems.value = []
+  addNewRectRow()
+  rectDialogVisible.value = true
+}
+
+function addNewRectRow() {
+  newRectItems.value.push({ itemName: '', requirement: '', deadline: '' })
+}
+
+function removeRectRow(idx: number) {
+  newRectItems.value.splice(idx, 1)
+}
+
+async function submitRectItems() {
+  const valid = newRectItems.value.filter(r => r.itemName.trim())
+  if (valid.length === 0) {
+    ElMessage.warning('请至少填写一项整改要求')
+    return
+  }
+  actionLoading.value = true
+  try {
+    await createRectificationItems(
+      task.value!.id!,
+      valid.map(r => ({
+        itemName: r.itemName,
+        requirement: r.requirement,
+        deadline: r.deadline || undefined,
+      })),
+    )
+    ElMessage.success('整改要求已添加')
+    rectDialogVisible.value = false
+    loadRectItems()
+    loadLogs()
+  } catch (e: any) {
+    ElMessage.error('添加失败：' + (e?.message ?? ''))
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+async function handleAcceptRect(item: RectificationItem) {
+  try {
+    await ElMessageBox.confirm(`确认验收「${item.itemName}」？`, '验收确认', { type: 'success' })
+  } catch { return }
+  try {
+    await acceptRectificationItem(item.id!)
+    ElMessage.success('验收成功')
+    loadRectItems()
+    loadLogs()
+  } catch (e: any) {
+    ElMessage.error('验收失败：' + (e?.message ?? ''))
+  }
+}
+
 function statusTag(status: number | undefined) {
   if (status === undefined) return { label: '未知', type: 'info' as const }
   return AUDIT_STATUS_MAP[status] ?? { label: '未知', type: 'info' as const }
 }
 
+function rectStatusTag(status: number | undefined) {
+  if (status === undefined) return { label: '未知', type: 'info' as const }
+  return RECTIFICATION_STATUS_MAP[status] ?? { label: '未知', type: 'info' as const }
+}
+
 function formatColName(col: string) {
   return col.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
+function formatDate(dt: string | undefined) {
+  if (!dt) return '—'
+  return dt.substring(0, 10)
 }
 
 onMounted(loadTask)
@@ -197,7 +289,6 @@ onMounted(loadTask)
     </div>
 
     <template v-if="task">
-      <!-- Enterprise Info -->
       <el-card shadow="never" style="margin-bottom: 16px">
         <template #header>
           <div class="card-header">
@@ -217,7 +308,6 @@ onMounted(loadTask)
         </el-descriptions>
       </el-card>
 
-      <!-- Enterprise Profile -->
       <el-card v-if="enterpriseInfo" shadow="never" style="margin-bottom: 16px">
         <template #header>
           <span class="card-title">企业基本信息</span>
@@ -238,7 +328,6 @@ onMounted(loadTask)
         </el-descriptions>
       </el-card>
 
-      <!-- Extracted Data -->
       <el-card shadow="never" style="margin-bottom: 16px">
         <template #header>
           <span class="card-title">填报数据审查</span>
@@ -277,7 +366,52 @@ onMounted(loadTask)
         </template>
       </el-card>
 
-      <!-- Action Area -->
+      <el-card shadow="never" style="margin-bottom: 16px">
+        <template #header>
+          <div class="card-header">
+            <span class="card-title">整改管理</span>
+            <el-button type="primary" size="small" @click="openRectDialog">
+              添加整改要求
+            </el-button>
+          </div>
+        </template>
+        <el-table v-loading="rectLoading" :data="rectItems" border stripe size="small" style="width: 100%">
+          <el-table-column label="整改项" prop="itemName" min-width="150" />
+          <el-table-column label="整改要求" prop="requirement" min-width="200" show-overflow-tooltip />
+          <el-table-column label="状态" width="90" align="center">
+            <template #default="{ row }">
+              <el-tag :type="rectStatusTag(row.status).type" size="small">
+                {{ rectStatusTag(row.status).label }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="截止日期" width="110" align="center">
+            <template #default="{ row }">{{ formatDate(row.deadline) }}</template>
+          </el-table-column>
+          <el-table-column label="完成时间" width="110" align="center">
+            <template #default="{ row }">{{ formatDate(row.completeTime) }}</template>
+          </el-table-column>
+          <el-table-column label="整改结果" prop="result" min-width="150" show-overflow-tooltip />
+          <el-table-column label="操作" width="80" align="center">
+            <template #default="{ row }">
+              <el-button
+                v-if="row.status === 1"
+                link
+                type="success"
+                size="small"
+                @click="handleAcceptRect(row)"
+              >
+                验收
+              </el-button>
+              <span v-else style="color: #c0c4cc; font-size: 12px">—</span>
+            </template>
+          </el-table-column>
+        </el-table>
+        <div v-if="rectItems.length === 0 && !rectLoading" style="color: #909399; text-align: center; padding: 20px">
+          暂无整改项
+        </div>
+      </el-card>
+
       <el-card shadow="never" style="margin-bottom: 16px">
         <template #header>
           <span class="card-title">审核操作</span>
@@ -315,7 +449,6 @@ onMounted(loadTask)
         </div>
       </el-card>
 
-      <!-- Audit Log Timeline -->
       <el-card shadow="never">
         <template #header>
           <span class="card-title">审核日志</span>
@@ -338,6 +471,30 @@ onMounted(loadTask)
         </div>
       </el-card>
     </template>
+
+    <el-dialog v-model="rectDialogVisible" title="添加整改要求" width="700px" :close-on-click-modal="false">
+      <div v-for="(item, idx) in newRectItems" :key="idx" class="rect-form-row">
+        <el-input v-model="item.itemName" placeholder="整改项名称" style="flex: 1" />
+        <el-input v-model="item.requirement" placeholder="整改要求" style="flex: 1.5" />
+        <el-date-picker
+          v-model="item.deadline"
+          type="date"
+          placeholder="截止日期"
+          value-format="YYYY-MM-DD"
+          style="width: 160px"
+        />
+        <el-button link type="danger" @click="removeRectRow(idx)" :disabled="newRectItems.length <= 1">
+          删除
+        </el-button>
+      </div>
+      <el-button type="primary" link @click="addNewRectRow" style="margin-top: 8px">
+        + 添加一行
+      </el-button>
+      <template #footer>
+        <el-button @click="rectDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="actionLoading" @click="submitRectItems">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -361,5 +518,11 @@ onMounted(loadTask)
 .action-buttons {
   display: flex;
   gap: 8px;
+}
+.rect-form-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
 }
 </style>

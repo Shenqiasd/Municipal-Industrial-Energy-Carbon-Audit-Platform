@@ -45,6 +45,10 @@ export const ACTION_LABEL_MAP: Record<string, string> = {
   APPROVE: '审核通过',
   REJECT: '审核退回',
   COMMENT: '添加评论',
+  ADD_RECTIFICATION: '添加整改要求',
+  UPDATE_RECTIFICATION: '更新整改进度',
+  ACCEPT_RECTIFICATION: '验收整改项',
+  OVERDUE_DETECTED: '超期检测',
 }
 
 export function submitForAudit(auditYear: number): Promise<AuditTask> {

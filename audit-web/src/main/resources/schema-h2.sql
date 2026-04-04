@@ -1067,7 +1067,27 @@ CREATE TABLE IF NOT EXISTS aw_audit_task (
     PRIMARY KEY (id)
 );
 
--- 48. aw_audit_log (审核日志表)
+-- 48a. aw_rectification_track (整改跟踪表)
+CREATE TABLE IF NOT EXISTS aw_rectification_track (
+    id              BIGINT       NOT NULL AUTO_INCREMENT,
+    task_id         BIGINT       NOT NULL,
+    enterprise_id   BIGINT       NOT NULL,
+    audit_year      INT          NOT NULL,
+    item_name       VARCHAR(256) DEFAULT NULL,
+    requirement     CLOB         DEFAULT NULL,
+    status          TINYINT      DEFAULT 0,
+    deadline        DATETIME     DEFAULT NULL,
+    complete_time   DATETIME     DEFAULT NULL,
+    result          CLOB         DEFAULT NULL,
+    create_by       VARCHAR(64),
+    create_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_by       VARCHAR(64),
+    update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted         TINYINT      NOT NULL DEFAULT 0,
+    PRIMARY KEY (id)
+);
+
+-- 48b. aw_audit_log (审核日志表)
 CREATE TABLE IF NOT EXISTS aw_audit_log (
     id              BIGINT       NOT NULL AUTO_INCREMENT,
     task_id         BIGINT       NOT NULL,
