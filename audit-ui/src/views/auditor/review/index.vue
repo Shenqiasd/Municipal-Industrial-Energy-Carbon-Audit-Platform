@@ -481,7 +481,7 @@ onMounted(loadTask)
           v-model="item.deadline"
           type="date"
           placeholder="截止日期"
-          value-format="YYYY-MM-DD"
+          value-format="YYYY-MM-DDTHH:mm:ss"
           style="width: 160px"
         />
         <el-button link type="danger" @click="removeRectRow(idx)" :disabled="newRectItems.length <= 1">

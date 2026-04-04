@@ -212,6 +212,7 @@ onMounted(loadRectItems)
               <span class="todo-icon">{{ rectIcon(item.status) }}</span>
               <div class="todo-info">
                 <div class="todo-name">{{ item.itemName }}</div>
+                <div v-if="item.requirement" class="todo-requirement">{{ item.requirement }}</div>
                 <div class="todo-meta">{{ rectMeta(item) }}</div>
               </div>
               <span class="todo-chip" :style="rectChip(item.status).style">{{ rectChip(item.status).label }}</span>
@@ -325,6 +326,7 @@ onMounted(loadRectItems)
   .todo-icon { font-size: 15px; flex-shrink: 0; }
   .todo-info { flex: 1; min-width: 0; }
   .todo-name { font-size: 13px; color: $text-primary; font-weight: 500; }
+  .todo-requirement { font-size: 12px; color: $text-secondary; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .todo-meta { font-size: 11.5px; color: $text-tertiary; margin-top: 1px; }
   .todo-chip {
     font-size: 11px; padding: 2px 8px; border-radius: 4px;
