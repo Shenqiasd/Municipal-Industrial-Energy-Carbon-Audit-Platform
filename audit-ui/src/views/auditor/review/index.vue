@@ -177,8 +177,8 @@ async function handleReject() {
     await rejectAuditTask(task.value!.id!, commentText.value)
     ElMessage.success('已退回')
     commentText.value = ''
-    rectDialogVisible.value = true
-    addNewRectRow()
+    loadTask()
+    openRectDialog()
   } catch (e: any) {
     ElMessage.error('操作失败：' + (e?.message ?? ''))
   } finally {

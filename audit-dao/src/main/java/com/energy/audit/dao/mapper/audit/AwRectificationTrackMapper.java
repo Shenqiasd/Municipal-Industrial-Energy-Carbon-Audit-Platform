@@ -25,5 +25,5 @@ public interface AwRectificationTrackMapper {
 
     int updateById(AwRectificationTrack track);
 
-    int batchUpdateStatus(@Param("ids") List<Long> ids, @Param("status") Integer status);
+    int batchUpdateStatus(@Param("ids") List<Long> ids, @Param("status") Integer status, @Param("updateBy") String updateBy);
 }

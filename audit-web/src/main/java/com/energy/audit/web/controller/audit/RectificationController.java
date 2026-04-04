@@ -39,7 +39,7 @@ public class RectificationController {
             throw new BusinessException(403, "您不是该任务的指定审核员");
         }
         String username = SecurityUtils.getCurrentUsername();
-        rectificationService.createItems(taskId, items, username);
+        rectificationService.createItems(taskId, items, operatorId, username);
         return R.ok();
     }
 
@@ -106,8 +106,9 @@ public class RectificationController {
             throw new BusinessException(400, "status 参数格式错误");
         }
         String result = body.get("result") != null ? body.get("result").toString() : null;
+        Long operatorId = SecurityUtils.getRequiredCurrentUserId();
         String username = SecurityUtils.getCurrentUsername();
-        rectificationService.updateProgress(id, status, result, username);
+        rectificationService.updateProgress(id, status, result, operatorId, username);
         return R.ok();
     }
 
@@ -122,7 +123,7 @@ public class RectificationController {
             throw new BusinessException(403, "您不是该任务的指定审核员");
         }
         String username = SecurityUtils.getCurrentUsername();
-        rectificationService.acceptItem(id, username);
+        rectificationService.acceptItem(id, operatorId, username);
         return R.ok();
     }
 

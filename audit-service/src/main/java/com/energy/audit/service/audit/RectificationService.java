@@ -6,7 +6,7 @@ import java.util.List;
 
 public interface RectificationService {
 
-    void createItems(Long taskId, List<AwRectificationTrack> items, String username);
+    void createItems(Long taskId, List<AwRectificationTrack> items, Long operatorId, String username);
 
     List<AwRectificationTrack> listByTaskId(Long taskId);
 
@@ -14,9 +14,9 @@ public interface RectificationService {
 
     int countOverdueByTaskId(Long taskId);
 
-    void updateProgress(Long id, Integer status, String result, String username);
+    void updateProgress(Long id, Integer status, String result, Long operatorId, String username);
 
-    void acceptItem(Long id, String username);
+    void acceptItem(Long id, Long operatorId, String username);
 
     AwRectificationTrack getById(Long id);
 

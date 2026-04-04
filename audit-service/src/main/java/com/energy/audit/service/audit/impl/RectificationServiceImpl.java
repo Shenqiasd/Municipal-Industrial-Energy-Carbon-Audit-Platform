@@ -36,7 +36,7 @@ public class RectificationServiceImpl implements RectificationService {
 
     @Override
     @Transactional
-    public void createItems(Long taskId, List<AwRectificationTrack> items, String username) {
+    public void createItems(Long taskId, List<AwRectificationTrack> items, Long operatorId, String username) {
         AwAuditTask task = taskMapper.selectById(taskId);
         if (task == null) {
             throw new BusinessException(404, "审核任务不存在");
@@ -46,6 +46,7 @@ public class RectificationServiceImpl implements RectificationService {
             if (item.getItemName() == null || item.getItemName().isBlank()) {
                 throw new BusinessException(400, "整改项名称不能为空");
             }
+            item.setId(null);
             item.setTaskId(taskId);
             item.setEnterpriseId(task.getEnterpriseId());
             item.setAuditYear(task.getAuditYear());
@@ -54,7 +55,7 @@ public class RectificationServiceImpl implements RectificationService {
             rectificationMapper.insert(item);
         }
 
-        addAuditLog(taskId, username, "ADD_RECTIFICATION",
+        addAuditLog(taskId, operatorId, username, "ADD_RECTIFICATION",
                 "添加 " + items.size() + " 项整改要求");
     }
 
@@ -75,13 +76,16 @@ public class RectificationServiceImpl implements RectificationService {
 
     @Override
     @Transactional
-    public void updateProgress(Long id, Integer status, String result, String username) {
+    public void updateProgress(Long id, Integer status, String result, Long operatorId, String username) {
         AwRectificationTrack track = rectificationMapper.selectById(id);
         if (track == null) {
             throw new BusinessException(404, "整改项不存在");
         }
         if (track.getStatus() == 2) {
             throw new BusinessException(400, "该整改项已验收完成，不可修改");
+        }
+        if (track.getStatus() == 3) {
+            throw new BusinessException(400, "该整改项已超期，请联系审核员处理");
         }
 
         if (status != 1 && status != 2) {
@@ -99,13 +103,13 @@ public class RectificationServiceImpl implements RectificationService {
         rectificationMapper.updateById(update);
 
         String statusLabel = status == 1 ? "进行中" : "已完成";
-        addAuditLog(track.getTaskId(), username, "UPDATE_RECTIFICATION",
+        addAuditLog(track.getTaskId(), operatorId, username, "UPDATE_RECTIFICATION",
                 "更新整改项「" + track.getItemName() + "」状态为" + statusLabel);
     }
 
     @Override
     @Transactional
-    public void acceptItem(Long id, String username) {
+    public void acceptItem(Long id, Long operatorId, String username) {
         AwRectificationTrack track = rectificationMapper.selectById(id);
         if (track == null) {
             throw new BusinessException(404, "整改项不存在");
@@ -121,7 +125,7 @@ public class RectificationServiceImpl implements RectificationService {
         update.setUpdateBy(username);
         rectificationMapper.updateById(update);
 
-        addAuditLog(track.getTaskId(), username, "ACCEPT_RECTIFICATION",
+        addAuditLog(track.getTaskId(), operatorId, username, "ACCEPT_RECTIFICATION",
                 "验收通过整改项「" + track.getItemName() + "」");
     }
 
@@ -145,21 +149,21 @@ public class RectificationServiceImpl implements RectificationService {
         List<Long> ids = candidates.stream()
                 .map(AwRectificationTrack::getId)
                 .collect(Collectors.toList());
-        rectificationMapper.batchUpdateStatus(ids, 3);
+        rectificationMapper.batchUpdateStatus(ids, 3, "SYSTEM");
 
         log.info("Marked {} rectification items as overdue", ids.size());
 
         candidates.stream()
                 .map(AwRectificationTrack::getTaskId)
                 .distinct()
-                .forEach(taskId -> addAuditLog(taskId, "SYSTEM", "OVERDUE_DETECTED",
+                .forEach(taskId -> addAuditLog(taskId, 0L, "SYSTEM", "OVERDUE_DETECTED",
                         "系统检测到超期整改项"));
     }
 
-    private void addAuditLog(Long taskId, String username, String action, String comment) {
+    private void addAuditLog(Long taskId, Long operatorId, String username, String action, String comment) {
         AwAuditLog auditLog = new AwAuditLog();
         auditLog.setTaskId(taskId);
-        auditLog.setOperatorId(0L);
+        auditLog.setOperatorId(operatorId != null ? operatorId : 0L);
         auditLog.setAction(action);
         auditLog.setComment(comment);
         auditLog.setOperationTime(LocalDateTime.now());

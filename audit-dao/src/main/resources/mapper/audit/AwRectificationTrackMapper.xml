@@ -126,7 +126,7 @@
 
     <update id="batchUpdateStatus">
         UPDATE aw_rectification_track
-        SET status = #{status}, update_time = NOW()
+        SET status = #{status}, update_time = NOW(), update_by = #{updateBy}
         WHERE deleted = 0 AND id IN
         <foreach collection="ids" item="id" open="(" separator="," close=")">
             #{id}
