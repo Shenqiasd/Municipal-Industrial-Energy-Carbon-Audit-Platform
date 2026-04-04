@@ -1041,3 +1041,44 @@ CREATE TABLE IF NOT EXISTS de_report_text (
     deleted                TINYINT       NOT NULL DEFAULT 0,
     PRIMARY KEY (id)
 );
+
+-- ============================================================================
+-- Audit Workflow Tables (aw_*)
+-- ============================================================================
+
+-- 47. aw_audit_task (审核任务表)
+CREATE TABLE IF NOT EXISTS aw_audit_task (
+    id              BIGINT       NOT NULL AUTO_INCREMENT,
+    enterprise_id   BIGINT       NOT NULL,
+    audit_year      INT          NOT NULL,
+    task_type       TINYINT      DEFAULT NULL,
+    task_title      VARCHAR(256) DEFAULT NULL,
+    status          TINYINT      DEFAULT 0,
+    assignee_id     BIGINT       DEFAULT NULL,
+    assign_time     DATETIME     DEFAULT NULL,
+    deadline        DATETIME     DEFAULT NULL,
+    complete_time   DATETIME     DEFAULT NULL,
+    result          VARCHAR(512) DEFAULT NULL,
+    create_by       VARCHAR(64),
+    create_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_by       VARCHAR(64),
+    update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted         TINYINT      NOT NULL DEFAULT 0,
+    PRIMARY KEY (id)
+);
+
+-- 48. aw_audit_log (审核日志表)
+CREATE TABLE IF NOT EXISTS aw_audit_log (
+    id              BIGINT       NOT NULL AUTO_INCREMENT,
+    task_id         BIGINT       NOT NULL,
+    operator_id     BIGINT       NOT NULL,
+    action          VARCHAR(32)  NOT NULL,
+    comment         CLOB         DEFAULT NULL,
+    operation_time  DATETIME     DEFAULT NULL,
+    create_by       VARCHAR(64),
+    create_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_by       VARCHAR(64),
+    update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted         TINYINT      NOT NULL DEFAULT 0,
+    PRIMARY KEY (id)
+);

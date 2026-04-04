@@ -30,11 +30,25 @@ A comprehensive enterprise-level web application for managing energy consumption
 | Wave 3 | SpreadJS Template Engine | ✅ Completed |
 | Wave 4 | Template-Driven Data Extraction | ✅ Completed |
 | Wave 5 | Menu Restructure & Extracted Data Overview | ✅ Completed |
-| Wave 6-9 | Flow Diagram, Charts, Reports, Workflow | Planned |
+| Wave 6 | Schema (24 de_* tables) | ✅ Completed |
+| Wave 9.1 | Audit Task Management (3-portal workflow) | ✅ Completed |
+| Wave 7-8 | Flow Diagram, Charts, Reports | Planned |
 | Wave 10 | Carbon Management & Platform Integration | Partial (emission factor CRUD done) |
 | Wave 11 | Optimization & Testing | Planned |
 
-**Current stage**: Wave 5 complete — deleted 24 placeholder entry pages, reorganized enterprise menu (工作台/基础设置/数据填报/图表分析/报告管理), built extracted data overview page with backend API
+**Current stage**: Wave 9.1 complete — Audit task management with enterprise submit, admin assign, auditor review/approve/reject across all 3 portals
+
+## Wave 9.1 — Audit Task Management
+- **Tables**: `aw_audit_task`, `aw_audit_log` (H2 + MySQL schema)
+- **Entities**: `AwAuditTask`, `AwAuditLog` with transient `enterpriseName`, `assigneeName`
+- **Mapper**: XML with JOIN queries, `selectList` dynamic conditions, `clearResult` for resubmit
+- **Service**: `AuditTaskServiceImpl` — submitForAudit (auto-assign round-robin), assign, approve, reject, comment
+- **Controller**: `AuditTaskController` — object-level access control (enterprise=own tasks, auditor=assigned tasks, admin=all)
+- **ExtractedDataController**: Updated to allow auditor/admin access with `enterpriseId` param
+- **Frontend API**: `audit-task.ts` with status maps and action labels
+- **Pages**: Enterprise generate/index.vue (submit-audit), admin audit-manage (task list + assign dialog + detail drawer), auditor dashboard/tasks/review
+- **Seed user**: `auditor/admin123` (userType=2, id=3)
+- **Security**: Role-based + ownership checks prevent IDOR — auditors can only see/act on assigned tasks
 
 ## Development Setup
 
@@ -115,7 +129,7 @@ mvn package -DskipTests -pl audit-web -am   # no -P dev → H2 excluded
 - **BusinessTablePersister**: `NamedParameterJdbcTemplate`; column names validated via `^[a-z][a-z0-9_]{0,63}$`; `camelToSnake()` lowercases mixed-case with underscores
 - **de_* tables**: delete by `submission_id` (NOT enterprise_id+audit_year) for isolation
 - **PageResult**: Backend returns `rows` (not `list`). `setting.ts` is canonical pattern.
-- **Backend login**: `POST /api/auth/login`; dev: `admin/admin123` (userType=1), `enterprise/admin123` (userType=3, enterpriseId=1)
+- **Backend login**: `POST /api/auth/login`; dev: `admin/admin123` (userType=1), `enterprise/admin123` (userType=3, enterpriseId=1), `auditor/admin123` (userType=2)
 - **MyBatis mapper XML**: `audit-dao/src/main/resources/mapper/{module}/`; MapperScan: `com.energy.audit.dao.mapper`
 
 ## Important Files
