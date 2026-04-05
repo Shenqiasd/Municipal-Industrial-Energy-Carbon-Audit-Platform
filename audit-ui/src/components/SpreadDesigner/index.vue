@@ -24,6 +24,48 @@ const gcError = ref(false)
 
 let designer: GCSpreadDesigner | null = null
 let workbook: GCSpreadWorkbook | null = null
+let bodyObserver: MutationObserver | null = null
+
+const SPREADJS_MARKERS = [
+  'gc-designer-dialog',
+  'gc-designer-dialog-overlay',
+  'gc-designer-root',
+  'gc-sjsdeisnger-popup',
+  'gc-sjs-designer-dialog',
+  'gc-popup-overlay',
+]
+const DIALOG_Z = '100001'
+const OVERLAY_Z = '100000'
+
+function elevateSpreadJSNode(node: Node) {
+  if (!(node instanceof HTMLElement)) return
+  const cl = node.classList
+  const isOverlay = cl.contains('gc-designer-dialog-overlay') || cl.contains('gc-popup-overlay')
+  const isSpreadJS = SPREADJS_MARKERS.some(c => cl.contains(c))
+  if (isSpreadJS || isOverlay) {
+    node.style.zIndex = isOverlay ? OVERLAY_Z : DIALOG_Z
+  }
+  if (!isSpreadJS && node.querySelector('.gc-designer-dialog-overlay, .gc-designer-dialog')) {
+    node.style.position = 'relative'
+    node.style.zIndex = DIALOG_Z
+  }
+}
+
+function startBodyObserver() {
+  bodyObserver = new MutationObserver((mutations) => {
+    for (const m of mutations) {
+      for (const node of m.addedNodes) {
+        elevateSpreadJSNode(node)
+        if (node instanceof HTMLElement) {
+          node.querySelectorAll('.gc-designer-dialog-overlay').forEach(el => {
+            ;(el as HTMLElement).style.zIndex = OVERLAY_Z
+          })
+        }
+      }
+    }
+  })
+  bodyObserver.observe(document.body, { childList: true, subtree: true })
+}
 
 onMounted(() => {
   const DesignerCtor = resolveDesignerConstructor()
@@ -33,10 +75,13 @@ onMounted(() => {
     return
   }
   initSpreadJSLicense()
+  startBodyObserver()
   initDesigner()
 })
 
 onBeforeUnmount(() => {
+  bodyObserver?.disconnect()
+  bodyObserver = null
   designer?.destroy()
   designer = null
   workbook = null

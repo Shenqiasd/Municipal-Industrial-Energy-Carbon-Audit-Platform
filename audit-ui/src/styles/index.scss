@@ -10,8 +10,16 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 body > .gc-sjs-designer-dialog,
-body > .gc-sjsdeisnger-popup {
+body > .gc-sjsdeisnger-popup,
+body > .gc-designer-dialog {
   position: fixed !important;
+  z-index: 100000 !important;
+}
+body > div:has(> .gc-designer-dialog-overlay) {
+  position: relative !important;
+  z-index: 100000 !important;
+}
+.gc-designer-dialog-overlay {
   z-index: 100000 !important;
 }
 
