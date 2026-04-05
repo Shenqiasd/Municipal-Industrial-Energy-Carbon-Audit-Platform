@@ -97,16 +97,17 @@ async function loadEnergyTrend() {
     trendOption.value = {
       tooltip: { trigger: 'axis' },
       legend: { data: ['综合能耗(tce)', '工业总产值(万元)', '单位产值能耗(tce/万元)'] },
-      grid: { left: 60, right: 60, bottom: 40 },
+      grid: { left: 70, right: 70, bottom: 40 },
       xAxis: { type: 'category', data: years },
       yAxis: [
-        { type: 'value', name: 'tce / 万元', position: 'left' },
-        { type: 'value', name: 'tce/万元', position: 'right', splitLine: { show: false } },
+        { type: 'value', name: '能耗(tce)', position: 'left' },
+        { type: 'value', name: '产值(万元) / 单耗(tce/万元)', position: 'right', splitLine: { show: false } },
       ],
       series: [
         {
           name: '综合能耗(tce)',
           type: 'bar',
+          yAxisIndex: 0,
           data: totalEnergy,
           itemStyle: { color: '#409EFF', borderRadius: [4, 4, 0, 0] },
           barMaxWidth: 40,
@@ -114,6 +115,7 @@ async function loadEnergyTrend() {
         {
           name: '工业总产值(万元)',
           type: 'bar',
+          yAxisIndex: 1,
           data: grossOutput,
           itemStyle: { color: '#67C23A', borderRadius: [4, 4, 0, 0] },
           barMaxWidth: 40,
