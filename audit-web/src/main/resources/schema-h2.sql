@@ -1125,3 +1125,24 @@ CREATE TABLE IF NOT EXISTS aw_audit_log (
     deleted         TINYINT      NOT NULL DEFAULT 0,
     PRIMARY KEY (id)
 );
+
+-- ar_report (audit report records)
+CREATE TABLE IF NOT EXISTS ar_report (
+    id                     BIGINT        NOT NULL AUTO_INCREMENT,
+    enterprise_id          BIGINT        NOT NULL,
+    audit_year             INT           NOT NULL,
+    report_name            VARCHAR(256),
+    report_type            TINYINT       NOT NULL DEFAULT 1,
+    status                 TINYINT       NOT NULL DEFAULT 0,
+    generated_file_path    VARCHAR(512),
+    uploaded_file_path     VARCHAR(512),
+    onlyoffice_doc_key     VARCHAR(128),
+    generate_time          DATETIME,
+    submit_time            DATETIME,
+    create_by              VARCHAR(64),
+    create_time            DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_by              VARCHAR(64),
+    update_time            DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted                TINYINT       NOT NULL DEFAULT 0,
+    PRIMARY KEY (id)
+);
