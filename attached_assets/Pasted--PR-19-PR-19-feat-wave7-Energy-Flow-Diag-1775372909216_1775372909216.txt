@@ -1,0 +1,255 @@
+# PR #19 深度代码审查报告（第二轮）
+
+## 概览
+
+| 项目 | 详情 |
+|------|------|
+| PR | [#19 feat(wave7): Energy Flow Diagram module with AntV X6 (rebased)](https://github.com/Shenqiasd/EnergyAuditPlatform/pull/19) |
+| 分支 | `feat/wave7-energy-flow-diagram` → `master` |
+| 变更规模 | **13 文件, +439 -0**（相比首轮 147 文件已大幅精简） |
+| 提交数 | 1（基于最新 master 重建的干净分支） |
+| 与首轮对比 | C-1(stub覆盖) ✅已解决, C-4(37冲突) ✅已解决, M-1(角色守卫) ✅已修复 |
+| 审查结论 | **🟡 Request Changes — 存在 2 个需修复问题 + 1 个已知限制** |
+
+---
+
+## 问题汇总
+
+| 严重级别 | 数量 |
+|----------|------|
+| 🔴 Critical（阻断合并） | 1 |
+| 🟡 Medium（合并前应修复） | 2 |
+| 🟢 Non-blocking（可后续修复） | 2 |
+| ℹ️ 已知限制（PR 描述已声明） | 1 |
+
+---
+
+## 首轮问题修复验证
+
+| 首轮问题 | 状态 | 验证说明 |
+|----------|------|---------|
+| C-1: 三个 ServiceImpl 被 stub 覆盖 | ✅ **已解决** | 分支已重建，不再包含 TemplateVersionServiceImpl/SubmissionServiceImpl/TagMappingServiceImpl 的改动 |
+| C-4: 37 个合并冲突 | ✅ **已解决** | `git merge --no-commit --no-ff origin/master` 返回 "Already up to date"，零冲突 |
+| M-1: EnergyFlowController 缺少角色守卫 | ✅ **已修复** | 所有三个端点均添加了 `requireEnterprise()` 调用 |
+| C-5: submit 端点 IDOR | ⚠️ **部分修复** | 见下方 C-1 |
+
+---
+
+## 🔴 Critical 问题
+
+### C-1: `TemplateController.submit` 的 IDOR 修复不完整 — `enterpriseId` 提取后未使用
+
+**文件**: `audit-web/src/main/java/com/energy/audit/web/controller/template/TemplateController.java:258-266`
+
+```java
+@PostMapping("/submission/{submissionId}/submit")
+public R<Void> submit(@PathVariable Long submissionId,
+                      @RequestParam Long templateVersionId) {
+    requireEnterprise();
+    Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId(); // ← 提取了
+    submissionService.submit(submissionId, templateVersionId);          // ← 但未传入！
+    return R.ok();
+}
+```
+
+**分析**: PR 只添加了一行 `Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();` 但没有将 `enterpriseId` 传递给 `submissionService.submit()`。目前 `submit()` 方法签名是 `void submit(Long submissionId, Long templateVersionId)`，内部通过 `SecurityUtils.getRequiredCurrentEnterpriseId()` 自行获取 enterpriseId，所以**实际运行时不存在 IDOR 漏洞**（service 层已有防护）。
+
+但这行代码是"死代码"——提取了变量却从未使用，会触发编译警告，且给代码审查者错误的安全信号。
+
+**严重性调整**: 实际安全风险为 🟢（因 service 层已有校验），但作为代码质量问题为 🟡。标记为 🔴 是因为这是对上轮 C-5 的回应性修复，修复不完整说明需要更仔细地检查修复意图。
+
+**修复建议**: 二选一：
+1. 删除未使用的 `enterpriseId` 变量（service 层已自行获取）
+2. 或修改 `SubmissionService.submit()` 签名接受 `enterpriseId` 参数，实现防御性双层校验
+
+---
+
+## 🟡 Medium 问题
+
+### M-1: `FlowEditor` 组件 props 接口与页面使用不匹配 — 运行时会报错
+
+**文件**:
+- `audit-ui/src/components/FlowEditor/index.vue:26-31` — 定义的 props
+- `audit-ui/src/views/enterprise/charts/energy-flow/index.vue:109` — 实际使用
+
+**FlowEditor 定义的 props**:
+```typescript
+const props = defineProps<{
+  enterpriseId: number    // required
+  auditYear: number       // required
+  diagramType?: string
+  readonly?: boolean
+}>()
+```
+
+**页面实际传入**:
+```vue
+<FlowEditor ref="flowEditorRef" :data="flowData" />
+```
+
+**问题**:
+1. 页面传入 `:data="flowData"` 但 FlowEditor 未定义 `data` prop
+2. FlowEditor 要求 `enterpriseId`（required）和 `auditYear`（required）但页面未传入
+3. 页面调用 `flowEditorRef.value.exportPng()` 和 `flowEditorRef.value.fitView()` 但 FlowEditor 只 expose 了 `save()` 方法
+
+**根因**: FlowEditor 组件从首轮的完整实现（316行，含 AntV X6 渲染逻辑、exportPng、fitView）**退化为一个空壳 stub**（99行，全部注释掉的 TODO），但页面代码仍然按原始接口调用。这意味着：
+- Vue 会在运行时对缺失的 required props 发出警告
+- `exportPng()` 和 `fitView()` 调用将抛出 TypeError（方法不存在）
+- 整个能源流向图页面将无法正常工作
+
+**修复建议**: 恢复 FlowEditor 的完整实现，或至少让 props 接口和 expose 方法与页面使用保持一致。
+
+---
+
+### M-2: `el-date-picker value-format="YYYY"` 导致 `auditYear` 类型从 number 变为 string
+
+**文件**: `audit-ui/src/views/enterprise/charts/energy-flow/index.vue:8-9, 93-101`
+
+```typescript
+const currentYear = new Date().getFullYear()  // number
+const auditYear = ref(currentYear)            // Ref<number>
+```
+
+```vue
+<el-date-picker
+  v-model="auditYear"
+  type="year"
+  value-format="YYYY"   <!-- 用户选择后返回 string "2024" -->
+  @change="loadData"
+/>
+```
+
+用户首次进入页面时 `auditYear` 是 number（如 `2026`），选择年份后变为 string（如 `"2024"`）。传给后端 API 时 `auditYear` 参数类型不一致，可能导致后端解析异常或查询不到数据。
+
+**修复建议**: 使用 `el-select` + 年份选项列表代替 `el-date-picker`，确保 value 始终为 number。
+
+---
+
+## 🟢 Non-blocking 问题
+
+### N-1: `EnergyFlowServiceImpl.saveBatch` 逐条 INSERT 效率低
+
+**文件**: `audit-service/src/main/java/com/energy/audit/service/data/impl/EnergyFlowServiceImpl.java:32-39`
+
+```java
+for (int i = 0; i < flows.size(); i++) {
+    energyFlowMapper.insert(flow);  // N 次 SQL INSERT
+}
+```
+
+每条记录单独执行一次 INSERT，数据量大时效率低。建议使用 MyBatis `<foreach>` 批量插入。
+
+### N-2: `@antv/x6` 依赖已添加到 package.json 但 FlowEditor 组件未实际使用
+
+**文件**: `audit-ui/package.json:12`
+
+```json
+"@antv/x6": "^2.19.2"
+```
+
+FlowEditor 组件内部 X6 Graph 代码全部被注释掉（TODO 状态），`import { Graph } from '@antv/x6'` 也被移除。依赖已安装但未使用，增加了打包体积。
+
+---
+
+## ℹ️ 已知限制（PR 描述已声明）
+
+### K-1: H2 单表 `de_energy_flow` 与 MySQL 三表设计不一致
+
+PR 描述明确声明：*"H2 单表设计用于开发，生产三表设计需后续对齐"*
+
+| 层级 | 状态 |
+|------|------|
+| H2 Schema (`de_energy_flow`) | ✅ 单表 |
+| Entity (`DeEnergyFlow.java`) | ✅ 与 H2 对齐 |
+| Mapper XML | ✅ 与 H2 对齐 |
+| MySQL Schema (`de_energy_flow_diagram` + `_node` + `_edge`) | ⚠️ 三表，后续需对齐 |
+
+三层内部一致性良好。生产对齐作为后续任务是合理的。
+
+---
+
+## 四层对齐检查
+
+### `de_energy_flow` 模块
+
+| H2 列名 | Entity 字段 | Mapper XML resultMap | Mapper XML INSERT | 状态 |
+|---------|------------|---------------------|-------------------|------|
+| id | id (BaseEntity) | ✅ | N/A (auto) | ✅ |
+| submission_id | submissionId | ✅ | ✅ | ✅ |
+| enterprise_id | enterpriseId | ✅ | ✅ | ✅ |
+| audit_year | auditYear | ✅ | ✅ | ✅ |
+| flow_stage | flowStage | ✅ | ✅ | ✅ |
+| seq_no | seqNo | ✅ | ✅ | ✅ |
+| source_unit | sourceUnit | ✅ | ✅ | ✅ |
+| target_unit | targetUnit | ✅ | ✅ | ✅ |
+| energy_product | energyProduct | ✅ | ✅ | ✅ |
+| physical_quantity | physicalQuantity (BigDecimal) | ✅ | ✅ | ✅ |
+| standard_quantity | standardQuantity (BigDecimal) | ✅ | ✅ | ✅ |
+| remark | remark | ✅ | ✅ | ✅ |
+| create_by/create_time/update_by/update_time/deleted | BaseEntity 继承 | ✅ | 部分 ✅ | ✅ |
+
+**结论**: H2 ↔ Entity ↔ Mapper XML 三层**完全对齐**，零差异。
+
+---
+
+## 安全审计
+
+| 端点 | 角色检查 | 企业隔离 | 状态 |
+|------|---------|---------|------|
+| `GET /energy-flow/list` | ✅ `requireEnterprise()` | ✅ `getRequiredCurrentEnterpriseId()` | ✅ |
+| `POST /energy-flow/save` | ✅ `requireEnterprise()` | ✅ `getRequiredCurrentEnterpriseId()` + service 层覆写 | ✅ |
+| `DELETE /energy-flow/{id}` | ✅ `requireEnterprise()` | ✅ `getRequiredCurrentEnterpriseId()` + mapper 双重 WHERE | ✅ |
+| SQL 注入 | 所有 Mapper XML 均使用 `#{}` 参数化 | 无 `${}` | ✅ |
+| `POST /template/submission/{id}/submit` | ✅ `requireEnterprise()` | ⚠️ 控制器层 enterpriseId 未传入（service 层自行获取，实际安全） | 🟡 代码质量 |
+
+---
+
+## 合并冲突分析
+
+`git merge --no-commit --no-ff origin/master` → **"Already up to date"**
+
+✅ **零冲突** — 分支已基于最新 master 重建。
+
+---
+
+## 自动化审查评论验证
+
+| # | 评论内容 | 是否仍适用于更新后 PR |
+|---|---------|---------------------|
+| 1 | TemplateVersionServiceImpl.createDraftVersion 是 no-op stub | ⚠️ **不适用** — 新 PR 不再修改此文件（master 已有完整实现） |
+| 2 | EntEnterpriseMapper.xml expireDate null 问题 | ⚠️ **不适用** — 新 PR 不再修改此文件 |
+| 3 | el-date-picker value-format 类型问题 | ✅ **仍适用** — 新 PR 包含此文件且问题仍存在 |
+
+> 注: Devin Review 自动评论是针对旧版 PR 147 文件的 diff 生成的。新 PR 仅 13 文件，大部分旧评论已不适用。
+
+---
+
+## 整体评价
+
+### 改进点（相比首轮）
+1. ✅ **分支重建彻底消除了 stub 覆盖和合并冲突问题** — 这是最重要的改进
+2. ✅ **EnergyFlowController 添加了 requireEnterprise() 角色守卫**
+3. ✅ **PR 变更范围从 147 文件缩小到 13 文件，聚焦 Wave 7 功能**
+4. ✅ **后端数据层（Entity → Mapper → Service → Controller）四层完全对齐**
+
+### 遗留问题
+1. 🔴 TemplateController.submit 的 enterpriseId 修复是死代码
+2. 🟡 FlowEditor 组件是空壳 stub，与页面调用接口不匹配，导致运行时异常
+3. 🟡 el-date-picker 类型不匹配（首轮即存在）
+
+---
+
+## 最终建议
+
+### 🟡 建议: **Request Changes（轻量修复即可）**
+
+相比首轮的 5 个 Critical 阻断问题，此轮仅剩 **2 个需修复问题**，修复工作量很小：
+
+### 合并前须修复:
+1. **TemplateController.submit**: 删除未使用的 `enterpriseId` 变量，或修改 submit 方法签名传入
+2. **FlowEditor 组件**: 修复 props 定义与页面使用的不匹配（恢复 `data` prop + `exportPng`/`fitView` expose），或将页面调用改为与当前 stub 接口一致
+
+### 可后续修复:
+- el-date-picker 类型问题
+- 批量 INSERT 性能优化
+- 未使用的 @antv/x6 依赖清理
