@@ -7,6 +7,7 @@ import type { EnergyFlowItem } from '@/api/energyFlow'
 
 const currentYear = new Date().getFullYear()
 const auditYear = ref(currentYear)
+const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - i)
 const flowData = ref<EnergyFlowItem[]>([])
 const loading = ref(false)
 const flowEditorRef = ref<InstanceType<typeof FlowEditor>>()
@@ -90,15 +91,9 @@ onMounted(() => {
     <div class="page-header">
       <h2>能源流向图 (C6)</h2>
       <div class="header-actions">
-        <el-date-picker
-          v-model="auditYear"
-          type="year"
-          placeholder="审计年度"
-          format="YYYY"
-          value-format="YYYY"
-          style="width: 120px"
-          @change="loadData"
-        />
+        <el-select v-model="auditYear" placeholder="审计年度" style="width: 120px" @change="loadData">
+          <el-option v-for="y in yearOptions" :key="y" :label="y + '年'" :value="y" />
+        </el-select>
         <el-button @click="loadSampleData">加载示例</el-button>
         <el-button @click="handleFitView">适应画布</el-button>
         <el-button type="primary" @click="handleSave" :loading="loading">保存</el-button>
