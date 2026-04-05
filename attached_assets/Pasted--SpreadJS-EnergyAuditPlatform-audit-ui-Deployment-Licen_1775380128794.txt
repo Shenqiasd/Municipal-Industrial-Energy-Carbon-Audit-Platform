@@ -1,0 +1,131 @@
+# SpreadJS 授权失败最终修复方案
+
+**项目：** EnergyAuditPlatform / audit-ui  
+**问题：** 页面持续显示 `Deployment License Key not found`  
+**文档版本：** v3（最终方案）  
+**日期：** 2026-04-05
+
+---
+
+## 一、问题根因（最终确认）
+
+经过三轮诊断，问题根因已完全确认：
+
+**Railway 平台对 Dockerfile 构建的 `ARG` 传参存在限制，Variables 中设置的环境变量不会自动作为 `--build-arg` 传入 Docker 构建过程。**
+
+具体证据链如下：
+
+| 诊断轮次 | 发现 |
+|---|---|
+| 第一轮 | 打包产物 `spreadjs-license-CZmfWz55.js` 内容为空 Key，仅打印警告 |
+| 第二轮 | 代码（`spreadjs-license.ts`、`Dockerfile`、`env.d.ts`）均已正确，排除代码 bug |
+| 第三轮 | 多次重新构建后 chunk hash **始终为 `CZmfWz55`**，内容从未改变，证明 Vite 构建时 `VITE_SPREADJS_LICENSE` 始终读到空字符串 |
+
+---
+
+## 二、最终修复方案：直接在源码中硬编码 Key
+
+由于 Railway 的构建参数传递机制限制，最可靠的方式是**直接在源码中写入 Key**，彻底绕过环境变量注入问题。
+
+### 修改文件
+
+**文件路径：** `audit-ui/src/utils/spreadjs-license.ts`
+
+**修改内容：** 将原来读取 `import.meta.env.VITE_SPREADJS_LICENSE` 的逻辑，替换为直接硬编码 Key 字符串。
+
+```typescript
+let initialized = false
+
+export function initSpreadJSLicense(): void {
+  if (initialized) return
+  if (typeof window.GC === 'undefined') return
+
+  // 直接硬编码 Key，绕过 Railway 构建时环境变量注入问题
+  const sheetsKey = 'sjs.ben-china.org.cn,E329943193644278#B1XM3QXR4YzUsBnaMxWRyg4KDR5UkFUW73kS9UGcyZXRZZHZx2UURNkVxglZxdWNTdGeopEWSBTR0NEW0h6NwREWF5GZoZFdHp5ZoVlYEd6LpJHZkRWbvNzMWdFbNR6YGJ5Kn9Uahl4axJHUzYHan9UWrcmRRpEMzZTaTZHUulmWWZWa7l4ZFFHZ7s6YstUYqB7d6lzLKBjWnV5KIh5ZBBlWIJWW4R7RZNEbxZGcjN4NjxkRoh6c4cUeFhkY4kUUtp5akZET7NHMZVVUSV4UBJ7S7QzLuplZatCUT9kT8ZWUS9GRSdEdxg4VB5USpB5by9UThBVUkJGZ7hke5RHMLRWYip4bvYHeT3UOxYHUztSQiojITJCLiUDOCBzMFFUMiojIIJCL8QDOxYTO6QjN0IicfJye#4Xfd5nIIlkSCJiOiMkIsICOx8idgMlSgQWYlJHcTJiOi8kI1tlOiQmcQJCLiETN6ATNwASNwQDM6IDMyIiOiQncDJCLigTM4AjNyAjMiojIwhXRiwiIuNmLnJ7buEmbph6Yt8WZi9ycqNnI0IyctRkIsICuPWOrFWOkZmeica+rcaOgKaekneOsVa+sieevDiukBaen4i+t5aui8SuI0ISYONkIsUWdyRnOiwmdFJCLigzNyQDN6MTOxMDN9kjMzIiOiQWSiwSfdtlOicGbmJCLlNHbhZmOiI7ckJye0ICbuFkI1pjIEJCLi4TP7R4aoFHNx8kTGRzKKpkSpZTSpZ5aLlEW4dEdBRzaXVXNKh6QxBDWxknN6FFWyRnSs3UZFJWa4I6VFNlRupWM6kTQptmdcp'
+
+  const designerKey = 'sjs.ben-china.org.cn,E234972387644114#B1tQ5REJ5cLFzRrMEawA7U9BXWK3mSBJGMn3GSFdneid5d7l5LxMUaxZGSB9EV9oUOSpEMMVne9pnZ6glcwp4NDlkSyoXduN4di9WMwImUWV4SphVUNF6RoZVeUJ5MxtiN53kZP9mZpVUZyR7NCVVRTFVWaNFbtlnQMpERHBHTvRXcSdXWPRGdwoXUycTVvVWQRtyTyQ7dQp5c8hndOxUOptSahBDO5FHahpmbEJVWIpkYyk4UUNVZil5aQpVdKZ4YUxUMRVlastGNZRVNWJ5dZZGZzpXRQdES8tSZKpmRRlEbmREMudjZvNGUH36M5RjWPhmW5ZEdBNXViFHOkdFeIdzSOp4KzYWSiojITJCLikTQGFDRFNkNiojIIJCL7ATM4ETO4EzN0IicfJye#4Xfd5nI9k5MzIiOiMkIsICOx8idg86bkRWQtIXZudWazVGRtMlSkFWZyB7UiojIOJyebpjIkJHUiwiIyUjNwUDMgUDM4AjNyAjMiojI4J7QiwiI8EDNwYjMwIjI0ICc8VkIsIibj9yZy3mLh9WaoNWLuVmYuMnazJiOiMXbEJCLig1jlzahlDZmpnInm/KnmDoimH9pnDblmPron71goLZgm7JtofbtmrIukLiOiEmTDJCLlVnc4pjIsZXRiwiI4ETM4QjN7gzMycTO4MjMiojIklkI1pjIEJCLi4TPRRVULJ7UlJFbPJHey2CZHdlRiJWUupESHZWVRZnSiNTe8RmQvoFORhXU4pGSlJzZW5mbw2UWoFVQYlFbz34aEJkWxdDazMzZjNVSMhib'
+
+  if (window.GC.Spread?.Sheets) {
+    window.GC.Spread.Sheets.LicenseKey = sheetsKey
+  }
+  if (designerKey && window.GC.Spread?.Sheets?.Designer) {
+    window.GC.Spread.Sheets.Designer.LicenseKey = designerKey
+  }
+
+  initialized = true
+}
+```
+
+---
+
+## 三、操作步骤
+
+```bash
+# 1. 修改 spreadjs-license.ts，替换为上方代码
+# 2. 提交并推送到 master
+git add audit-ui/src/utils/spreadjs-license.ts
+git commit -m "fix: hardcode SpreadJS license key to bypass Railway build-arg issue"
+git push origin master
+```
+
+Railway 检测到新 commit 后会自动触发完整构建，构建完成后授权问题即可解决。
+
+---
+
+## 四、验证方法
+
+部署完成后，通过以下两种方式验证：
+
+### 方法一：检查 chunk 文件名 hash
+
+访问 `https://sjs.ben-china.org.cn/`，查看页面源码中 `spreadjs-license` chunk 的文件名：
+
+- **修复成功：** 文件名 hash **不再是 `CZmfWz55`**，变为新的 hash 值
+- **仍未修复：** 文件名仍为 `spreadjs-license-CZmfWz55.js`
+
+### 方法二：浏览器控制台验证
+
+访问 `https://sjs.ben-china.org.cn/admin/template`，按 **F12** 打开控制台，执行：
+
+```javascript
+GC.Spread.Sheets.LicenseKey
+```
+
+- **修复成功：** 返回以 `sjs.ben-china.org.cn,E329943...` 开头的完整字符串
+- **仍未修复：** 返回 `undefined`
+
+---
+
+## 五、重要注意事项
+
+> **当前 Key 为临时试用授权，有效期至 2026-04-18。**
+
+| 授权类型 | 授权码前缀 | 过期时间 |
+|---|---|---|
+| SpreadJS V18 表格控件 | `sjs.ben-china.org.cn,E329943...` | 2026-04-18 |
+| SpreadJS V18 在线表格编辑器 | `sjs.ben-china.org.cn,E234972...` | 2026-04-18 |
+| 绑定域名 | `sjs.ben-china.org.cn` | — |
+
+**到期前需要：**
+1. 重新前往 [https://www.grapecity.com.cn/developer/spreadjs/deploy](https://www.grapecity.com.cn/developer/spreadjs/deploy) 申请新的试用 Key
+2. 更新 `spreadjs-license.ts` 中的 Key 字符串
+3. 推送 commit 触发重新构建
+
+---
+
+## 六、后续正式上线建议
+
+正式上线时，建议购买正式授权并改回环境变量方式管理 Key，同时解决 Railway 的 build-arg 传参问题。可参考以下两种方案：
+
+**方案 A：使用 Railway 的 `railway.toml` 配置文件**
+
+在项目根目录创建 `railway.toml`，显式声明构建参数：
+
+```toml
+[build]
+buildCommand = "docker build --build-arg VITE_SPREADJS_LICENSE=$VITE_SPREADJS_LICENSE --build-arg VITE_SPREADJS_DESIGNER_LICENSE=$VITE_SPREADJS_DESIGNER_LICENSE -t app ."
+```
+
+**方案 B：改用 Nixpacks 构建（非 Dockerfile）**
+
+Railway 的 Nixpacks 构建器会自动将所有 Variables 注入为构建时环境变量，无需手动配置 `--build-arg`。
