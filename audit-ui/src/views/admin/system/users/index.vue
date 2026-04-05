@@ -45,8 +45,17 @@ const userTypeMap: Record<number, string> = { 1: '管理员', 2: '审核员', 3:
 const enterpriseList = ref<Enterprise[]>([])
 async function loadEnterprises() {
   try {
-    const res = await enterpriseApi.getList({ pageNum: 1, pageSize: 999 })
-    enterpriseList.value = res.rows
+    let pageNum = 1
+    const pageSize = 100
+    let all: Enterprise[] = []
+    let hasMore = true
+    while (hasMore) {
+      const res = await enterpriseApi.getList({ pageNum, pageSize })
+      all = all.concat(res.rows)
+      hasMore = all.length < res.total
+      pageNum++
+    }
+    enterpriseList.value = all
   } catch {}
 }
 
@@ -99,6 +108,10 @@ function handleEdit(row: SysUser) {
 
 async function handleSubmit() {
   await formRef.value?.validate()
+  if (form.userType === 3 && !form.enterpriseId) {
+    ElMessage.warning('企业用户必须选择所属企业')
+    return
+  }
   try {
     const data = { ...form }
     if (isEdit.value) {
