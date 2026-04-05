@@ -1,0 +1,152 @@
+# SpreadJS 部署授权失败修复文档
+
+**项目：** EnergyAuditPlatform / audit-ui  
+**问题：** 页面显示 `Deployment License Key not found. Email us.sales@grapecity.com or visit www.grapecity.com to request a testing deployment license.`  
+**定位时间：** 2026-04-05  
+**问题性质：** 构建时环境变量未注入，导致授权代码逻辑失效
+
+---
+
+## 一、问题根因
+
+### 直接证据
+
+通过下载线上打包产物 `spreadjs-license-CZmfWz55.js`，发现其实际内容如下：
+
+```javascript
+function n() {
+  if (!(typeof window.GC > "u")) {
+    console.warn("[SpreadJS] VITE_SPREADJS_LICENSE not set — running in trial mode");
+    return;
+  }
+}
+export { n as i };
+```
+
+**结论：** 该文件中 `GC.Spread.Sheets.LicenseKey` 和 `GC.Spread.Sheets.Designer.LicenseKey` **均未被赋值**。函数体只打印了一条警告后直接返回，授权 Key 完全没有传入 SpreadJS。
+
+### 根本原因
+
+`VITE_` 前缀的环境变量是 **Vite 构建时静态注入**的，不是运行时读取的。构建时若环境变量为空，Vite 会将 `import.meta.env.VITE_SPREADJS_LICENSE` 替换为空字符串 `""`，导致条件判断走入"未设置"分支，赋值代码被完全跳过。
+
+**即：Railway 上的环境变量在 Docker 构建阶段没有被正确传入 Vite，导致打包产物中不含任何授权 Key。**
+
+---
+
+## 二、修复步骤
+
+### Step 1：确认 Railway 环境变量名称完全正确
+
+登录 [Railway 控制台](https://railway.app/dashboard) → 进入 `audit-ui` 服务 → 点击 **Variables** 标签。
+
+确认以下两个变量**存在且值不为空**：
+
+| 变量名（区分大小写） | 正确值示例 |
+|---|---|
+| `VITE_SPREADJS_LICENSE` | `sjs.ben-china.org.cn,E329943193644278#B1XM3QXR4Yz...（完整 Key）` |
+| `VITE_SPREADJS_DESIGNER_LICENSE` | `sjs.ben-china.org.cn,E234972387644114#B1tQ5REJ5cL...（完整 Key）` |
+
+> **注意事项：**
+> - 变量名必须完全一致，区分大小写
+> - 值必须包含域名前缀，格式为 `sjs.ben-china.org.cn,E3299...`（域名 + 英文逗号 + Key 字符串）
+> - 不能有多余的空格或换行符
+
+### Step 2：确认 Dockerfile 中的 ARG 声明
+
+检查 `audit-ui/Dockerfile`，确保以下内容存在且顺序正确：
+
+```dockerfile
+FROM node:20-alpine AS build
+
+# 声明构建参数（必须在 RUN 命令之前）
+ARG VITE_SPREADJS_LICENSE=""
+ARG VITE_SPREADJS_DESIGNER_LICENSE=""
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+
+# 将 ARG 转为 ENV，使 Vite 构建时可以读取
+ENV VITE_SPREADJS_LICENSE=$VITE_SPREADJS_LICENSE
+ENV VITE_SPREADJS_DESIGNER_LICENSE=$VITE_SPREADJS_DESIGNER_LICENSE
+
+COPY . .
+RUN npx vite build   # ← 此时 Key 会被打包进静态文件
+```
+
+> **Railway 的工作机制：** Railway 会自动将 Variables 中的变量作为 `--build-arg` 传递给 Dockerfile 中声明的同名 `ARG`，前提是 Dockerfile 中必须有对应的 `ARG` 声明。
+
+### Step 3：确认 `spreadjs-license.ts` 源码逻辑正确
+
+检查 `src/utils/spreadjs-license.ts`，确保赋值逻辑完整：
+
+```typescript
+export function initSpreadJSLicense() {
+  const sheetsKey = import.meta.env.VITE_SPREADJS_LICENSE;
+  const designerKey = import.meta.env.VITE_SPREADJS_DESIGNER_LICENSE;
+
+  if (!sheetsKey) {
+    console.warn("[SpreadJS] VITE_SPREADJS_LICENSE not set — running in trial mode");
+    return;
+  }
+
+  // 表格控件授权（必须在 new Workbook() 之前）
+  GC.Spread.Sheets.LicenseKey = sheetsKey;
+
+  // 设计器授权（必须在 new Designer() 之前）
+  if (designerKey && GC.Spread.Sheets.Designer) {
+    GC.Spread.Sheets.Designer.LicenseKey = designerKey;
+  }
+}
+```
+
+并确认 `initSpreadJSLicense()` 在 `main.ts` 中被调用，且**在初始化任何 SpreadJS 控件之前执行**。
+
+### Step 4：触发完整重新构建（Redeploy）
+
+> ⚠️ **仅重启（Restart）服务是无效的**，必须触发完整的重新构建（Rebuild）。
+
+有以下两种方式触发重新构建：
+
+**方式 A（推荐）：** 在 Railway 控制台中，进入 `audit-ui` 服务 → 点击最新的 Deployment → 点击 **"Redeploy"** 按钮。
+
+**方式 B：** 向 GitHub 仓库推送任意一次 commit，Railway 会自动触发新的构建流程。
+
+---
+
+## 三、验证修复结果
+
+部署完成后，在浏览器中访问 `https://sjs.ben-china.org.cn/admin/template`，打开设计器，然后按 **F12** 打开开发者工具，在控制台执行：
+
+```javascript
+// 验证表格控件 Key
+GC.Spread.Sheets.LicenseKey
+
+// 验证设计器 Key
+GC.Spread.Sheets.Designer.LicenseKey
+```
+
+**修复成功的标志：** 两个命令均返回以 `sjs.ben-china.org.cn,E3...` 开头的完整授权字符串，且设计器页面不再显示黑色授权警告弹窗。
+
+---
+
+## 四、常见排查问题
+
+| 现象 | 可能原因 | 解决方法 |
+|---|---|---|
+| 控制台输出 `[SpreadJS] VITE_SPREADJS_LICENSE not set` | 构建时环境变量为空 | 检查 Railway Variables 并重新构建 |
+| `GC.Spread.Sheets.LicenseKey` 返回 `undefined` 或空字符串 | Key 未被赋值 | 检查 `spreadjs-license.ts` 源码逻辑 |
+| 设置了变量但重新部署后仍无效 | 触发的是 Restart 而非 Rebuild | 必须触发完整的 Redeploy/Rebuild |
+| Key 有值但仍报授权错误 | 域名不匹配 | 确认访问域名与申请 Key 时填写的域名完全一致（`sjs.ben-china.org.cn`） |
+| Key 有值、域名匹配但仍报错 | Key 过期 | 临时部署授权有效期 1 个月，需重新申请 |
+
+---
+
+## 五、授权信息备查
+
+| 授权类型 | 绑定域名 | 过期时间 |
+|---|---|---|
+| SpreadJS V18 表格控件 部署试用授权 | `sjs.ben-china.org.cn` | 2026-04-18 |
+| SpreadJS V18 在线表格编辑器 部署试用授权 | `sjs.ben-china.org.cn` | 2026-04-18 |
+
+> **提醒：** 试用授权到期后需前往 [葡萄城官网](https://www.grapecity.com.cn/developer/spreadjs/deploy) 重新申请。同一公司、域名只能申请一次，如需更换域名请联系 `sales@grapecity.com.cn`。
