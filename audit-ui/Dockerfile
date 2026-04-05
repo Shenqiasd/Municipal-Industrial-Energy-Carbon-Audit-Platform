@@ -1,4 +1,5 @@
 FROM node:20-alpine AS build
+# cache-bust: force rebuild to inject SpreadJS license env vars (2026-04-05)
 ARG VITE_SPREADJS_LICENSE=""
 ARG VITE_SPREADJS_DESIGNER_LICENSE=""
 WORKDIR /app
