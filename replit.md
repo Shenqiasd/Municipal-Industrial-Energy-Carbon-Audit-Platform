@@ -57,17 +57,22 @@ A comprehensive enterprise-level web application for managing energy consumption
 - **GitHub PR**: #20 feat/wave8-echarts-charts
 
 ## Sprint 8.1 — Report Generation Engine (Apache POI)
-- **ArReport entity**: `audit-model/.../entity/report/ArReport.java` — enterprise_id, audit_year, report_name, report_type, status, generated_file_path
+- **ArReport entity**: `audit-model/.../entity/report/ArReport.java` — enterprise_id, audit_year, report_name, report_type, status (0=draft, 1=generating, 2=done, 3=failed), generated_file_path
 - **ArReportMapper**: MyBatis XML with insert/update/selectById/selectByEnterprise/selectByEnterpriseAndYear
 - **ReportService**: generateReport (collect de_* data → POI Word → ar_report record), listReports, getReport, downloadReport
-- **WordReportBuilder**: generates 7-chapter Word document with tables:
-  1. Enterprise basic info
-  2. Tech indicators (multi-year comparison)
-  3. Energy balance (with totals)
-  4. Product unit consumption
-  5. GHG emissions (with totals)
-  6. Energy flow details
-  7. Energy saving suggestions
+  - Concurrency lock: always pre-inserts/updates to status=1 before generation; resets to status=3 on failure (never stuck)
+  - Data sources: ent_enterprise, ent_enterprise_setting, de_company_overview, de_tech_indicator, de_energy_balance, de_product_unit_consumption, de_ghg_emission, de_energy_flow
+- **WordReportBuilder**: generates mapping-doc-aligned Word document:
+  - Cover page (enterprise name, audit period, compiler)
+  - Table of contents
+  - 能源审计基本信息表 (enterprise + setting fields)
+  - Ch1: 审计事项说明 (5 sections)
+  - Ch2: 企业基本情况 (Table 2 upper: company overview, lower: 16 tech indicators multi-year; energy flow detail)
+  - Ch3: 企业能源管理运行状况分析 (5 sections)
+  - Ch4: 能源统计和温室气体排放数据审核 (tech indicator summary table, GHG emission table with totals, data-driven YoY analysis)
+  - Ch5: 企业用能情况分析 (energy balance table with percentages and totals)
+  - Ch6: 主要用能设备及系统节能分析 (product unit consumption table)
+  - Ch7: 审计结论与节能降碳建议 (6 sections)
 - **ReportController**: `POST /report/generate`, `GET /report/list`, `GET /report/{id}`, `GET /report/{id}/download`
 - **H2 table**: `ar_report` added to schema-h2.sql
 - **Frontend**: `report.ts` API client, updated generate/index.vue with report generation card + report listing + download
