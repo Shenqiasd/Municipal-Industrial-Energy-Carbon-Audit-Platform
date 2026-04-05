@@ -9,18 +9,15 @@ body {
   color: $text-primary;
   -webkit-font-smoothing: antialiased;
 }
-body > .gc-sjs-designer-dialog,
-body > .gc-sjsdeisnger-popup,
-body > .gc-designer-dialog {
+.gc-designer-dialog {
   position: fixed !important;
-  z-index: 100000 !important;
-}
-body > div:has(> .gc-designer-dialog-overlay) {
-  position: fixed !important;
-  z-index: 100000 !important;
+  z-index: 9999 !important;
 }
 .gc-designer-dialog-overlay {
-  z-index: 100000 !important;
+  z-index: 9998 !important;
+}
+.gc-sjsdeisnger-popup {
+  z-index: 9999 !important;
 }
 
 a { text-decoration: none; color: inherit; }
