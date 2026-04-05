@@ -5,7 +5,7 @@ COPY package.json ./
 RUN npm install --registry=https://registry.npmmirror.com
 COPY . .
 ENV VITE_SPREADJS_LICENSE=$VITE_SPREADJS_LICENSE
-RUN npm run build
+RUN npx vite build
 
 FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
