@@ -5,9 +5,10 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.io.Serial;
+import java.time.LocalDateTime;
 
 /**
- * Template submission entity
+ * Template submission entity — maps to tpl_submission
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -16,27 +17,27 @@ public class TplSubmission extends BaseEntity {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    /** Enterprise ID */
+    /** Enterprise ID -> ent_enterprise.id */
     private Long enterpriseId;
 
-    /** Template version ID */
-    private Long templateVersionId;
+    /** Template ID -> tpl_template.id */
+    private Long templateId;
 
-    /** SpreadJS JSON data (filled by enterprise) */
-    private String spreadjsData;
+    /** Template version number (snapshot at submission time) */
+    private Integer templateVersion;
 
     /** Audit year */
     private Integer auditYear;
 
-    /** Submission status (0=draft, 1=submitted, 2=approved, 3=rejected) */
+    /** Raw SpreadJS JSON as filled by the enterprise (LONGTEXT) */
+    private String submissionJson;
+
+    /** Extracted structured data as JSON string (MySQL JSON / H2 CLOB) */
+    private String extractedData;
+
+    /** Status (0=draft, 1=submitted) */
     private Integer status;
 
-    /** Auditor ID */
-    private Long auditorId;
-
-    /** Audit opinion */
-    private String auditOpinion;
-
-    /** Remark */
-    private String remark;
+    /** Submission timestamp (set when status changes to 1) */
+    private LocalDateTime submitTime;
 }

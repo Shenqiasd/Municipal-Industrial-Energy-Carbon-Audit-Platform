@@ -14,11 +14,15 @@ public interface BsEnergyMapper {
 
     BsEnergy selectById(@Param("id") Long id);
 
+    BsEnergy selectByIdAndEnterprise(@Param("id") Long id, @Param("enterpriseId") Long enterpriseId);
+
+    BsEnergy selectByEnterpriseAndName(@Param("enterpriseId") Long enterpriseId, @Param("name") String name);
+
     List<BsEnergy> selectList(BsEnergy query);
 
     int insert(BsEnergy energy);
 
     int updateById(BsEnergy energy);
 
-    int deleteById(@Param("id") Long id);
+    int deleteById(@Param("id") Long id, @Param("updateBy") String updateBy);
 }

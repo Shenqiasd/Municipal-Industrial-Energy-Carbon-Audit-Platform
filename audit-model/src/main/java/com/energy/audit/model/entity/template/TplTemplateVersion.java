@@ -5,9 +5,10 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.io.Serial;
+import java.time.LocalDateTime;
 
 /**
- * Template version entity
+ * Template version entity — maps to tpl_template_version
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -16,18 +17,21 @@ public class TplTemplateVersion extends BaseEntity {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    /** Template ID */
+    /** Template ID -> tpl_template.id */
     private Long templateId;
 
     /** Version number */
-    private Integer versionNum;
+    private Integer version;
 
-    /** SpreadJS JSON content */
-    private String spreadjsJson;
+    /** SpreadJS template JSON (LONGTEXT) */
+    private String templateJson;
 
-    /** Version description */
-    private String description;
+    /** Change description */
+    private String changeLog;
 
-    /** Status (0=draft, 1=published) */
-    private Integer status;
+    /** Published flag (0=draft, 1=published) */
+    private Integer published;
+
+    /** Publish timestamp */
+    private LocalDateTime publishTime;
 }
