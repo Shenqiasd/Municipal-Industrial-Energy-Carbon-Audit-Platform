@@ -9,7 +9,8 @@ body {
   color: $text-primary;
   -webkit-font-smoothing: antialiased;
 }
-body > .gc-sjs-designer-dialog {
+body > .gc-sjs-designer-dialog,
+body > .gc-sjsdeisnger-popup {
   position: fixed !important;
   z-index: 100000 !important;
 }
