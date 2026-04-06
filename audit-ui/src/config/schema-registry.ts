@@ -38,8 +38,6 @@ export const SCHEMA_REGISTRY: Record<string, TableSchema> = {
       total_energy_equal:         { label: '综合能耗等价值(吨标煤)', type: 'DECIMAL' },
       total_energy_excl_material: { label: '综合能耗剔除原料(吨标煤)', type: 'DECIMAL' },
       unit_output_energy:         { label: '单位产值综合能耗', type: 'DECIMAL' },
-      unit_output_energy_equiv:   { label: '单位产值能耗当量值', type: 'DECIMAL' },
-      unit_output_energy_equal:   { label: '单位产值能耗等价值', type: 'DECIMAL' },
       saving_project_count:       { label: '节能项目数', type: 'NUMBER' },
       saving_invest_total:        { label: '投资总额(万元)', type: 'DECIMAL' },
       saving_capacity:            { label: '节能能力(吨标煤)', type: 'DECIMAL' },

@@ -24,3 +24,8 @@ Thumbs.db
 
 # Local config
 application-local.yml
+.local/
+
+# Scratch / review notes (never commit)
+attached_assets/
+audit-web/upload/
