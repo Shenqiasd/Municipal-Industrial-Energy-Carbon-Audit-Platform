@@ -63,7 +63,7 @@ public class SpreadsheetDataExtractor {
                 } else {
                     Object value = null;
                     if (namedRanges.containsKey(tagName)) {
-                        value = extractFromNamedRange(sheets, sheetNameList, namedRanges.get(tagName));
+                        value = extractFromNamedRange(sheets, sheetNameList, namedRanges.get(tagName), mapping.getSheetName());
                     } else if (cellTags.containsKey(tagName)) {
                         value = extractCellValue(cellTags.get(tagName));
                     }
@@ -313,12 +313,16 @@ public class SpreadsheetDataExtractor {
         return map;
     }
 
-    private Object extractFromNamedRange(JsonNode sheets, List<String> sheetNameList, JsonNode rangeNode) {
+    private Object extractFromNamedRange(JsonNode sheets, List<String> sheetNameList,
+                                          JsonNode rangeNode, String preferredSheetName) {
         int sheetIdx = rangeNode.path("sheetIndex").asInt(0);
         int row = rangeNode.path("row").asInt(0);
         int col = rangeNode.path("col").asInt(0);
 
-        String sheetName = resolveSheetName(sheets, sheetNameList, null, sheetIdx);
+        // For named ranges, use rangeNode's own sheetIndex to resolve name if available
+        String resolved = sheetIdx >= 0 && sheetIdx < sheetNameList.size()
+                ? sheetNameList.get(sheetIdx) : preferredSheetName;
+        String sheetName = resolveSheetName(sheets, sheetNameList, resolved, sheetIdx);
         if (sheetName == null) {
             log.warn("extractFromNamedRange: sheetIndex {} out of range (sheets={})", sheetIdx, sheetNameList.size());
             return null;
