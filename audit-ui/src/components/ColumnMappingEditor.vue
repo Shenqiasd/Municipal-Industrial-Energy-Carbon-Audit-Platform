@@ -43,9 +43,21 @@ const mappings = computed<ColumnMapping[]>({
 
 const fieldOptions = computed(() => getFieldOptions(props.targetTable))
 
-function updateRow(index: number, key: keyof ColumnMapping, value: any) {
+function updateCol(index: number, value: number) {
   const copy = mappings.value.map((m) => ({ ...m }))
-  ;(copy[index] as any)[key] = value
+  copy[index].col = value
+  mappings.value = copy
+}
+
+function updateField(index: number, value: string) {
+  const copy = mappings.value.map((m) => ({ ...m }))
+  copy[index].field = value
+  mappings.value = copy
+}
+
+function updateType(index: number, value: string) {
+  const copy = mappings.value.map((m) => ({ ...m }))
+  copy[index].type = value
   mappings.value = copy
 }
 
@@ -81,7 +93,7 @@ function removeRow(index: number) {
         controls-position="right"
         class="col-num"
         :disabled="disabled"
-        @update:model-value="(v: number | undefined) => updateRow(idx, 'col', v ?? 0)"
+        @update:model-value="(v: number | undefined) => updateCol(idx, v ?? 0)"
       />
       <el-select
         :model-value="row.field"
@@ -91,7 +103,7 @@ function removeRow(index: number) {
         placeholder="选择字段"
         class="col-field"
         :disabled="disabled"
-        @update:model-value="(v: string) => updateRow(idx, 'field', v)"
+        @update:model-value="(v: string) => updateField(idx, v)"
       >
         <el-option
           v-for="opt in fieldOptions"
@@ -105,7 +117,7 @@ function removeRow(index: number) {
         size="small"
         class="col-type"
         :disabled="disabled"
-        @update:model-value="(v: string) => updateRow(idx, 'type', v)"
+        @update:model-value="(v: string) => updateType(idx, v)"
       >
         <el-option
           v-for="opt in COL_TYPE_OPTIONS"

@@ -97,8 +97,7 @@ export const SCHEMA_REGISTRY: Record<string, TableSchema> = {
   de_equipment_benchmark: {
     label: '重点用能设备能效对标',
     fields: {
-      submission_id: { label: '关联填报数据', type: 'NUMBER' },
-      remark:        { label: '备注', type: 'STRING' },
+      remark: { label: '备注', type: 'STRING' },
     },
   },
 

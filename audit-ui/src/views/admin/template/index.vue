@@ -498,7 +498,7 @@ onMounted(loadData)
                 </el-select>
                 <el-select
                   v-model="tag.fieldName"
-                  placeholder="选择字段 (fieldName)"
+                  :placeholder="tag.targetTable ? '选择字段 (fieldName)' : '请先选择目标表'"
                   size="small"
                   filterable
                   clearable
