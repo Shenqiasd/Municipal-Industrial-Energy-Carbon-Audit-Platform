@@ -1,0 +1,118 @@
+# 字段映射配置：目标表（targetTable）输入方式改进建议
+
+本文档针对能碳审计管理平台模板设计器中“字段映射配置”面板的 `targetTable` 字段输入方式进行分析，并提供将其改为下拉选择框的改进建议与代码实现方案。
+
+## 1. 当前设计分析
+
+### 1.1 当前实现状态
+通过分析前端编译后的代码（如 `index-ClxwTdYC.js` 等 chunk 文件），确认当前 `targetTable` 字段的实现确实是一个**普通文本输入框**（`el-input`）。
+
+在当前的 Vue 组件中，其代码结构大致如下：
+```vue
+<el-input 
+  v-model="item.targetTable" 
+  placeholder="目标表 (targetTable)" 
+  size="small" 
+  :disabled="isReadonly" 
+  style="margin-top: 4px;"
+/>
+```
+
+### 1.2 当前设计的痛点
+采用手动输入表名的方式存在以下几个明显的痛点：
+
+| 痛点维度 | 详细说明 | 潜在风险 |
+| :--- | :--- | :--- |
+| **易用性差** | 用户在配置时需要凭借记忆手动输入数据库的物理表名（如 `energy_consumption`）。 | 对于非开发人员或对数据库结构不熟悉的用户，配置门槛极高。 |
+| **容易出错** | 纯文本输入缺乏校验机制，极易发生拼写错误、大小写错误或多余空格。 | 导致数据抽取或回填时找不到目标表，引发系统异常。 |
+| **一致性低** | 同一个表在不同字段的映射配置中，可能会被输入成不同的格式。 | 数据映射关系混乱，后期排查和修复成本高。 |
+
+## 2. 改进建议：改为下拉选择框
+
+为了提升系统的健壮性和用户体验，强烈建议将 `targetTable` 的输入方式从 `el-input`（文本框）更改为 `el-select`（下拉选择框）。
+
+### 2.1 预期效果
+- 用户点击“目标表”输入框时，弹出一个包含所有可用数据库表名的下拉列表。
+- 下拉列表应同时展示**表名的中文描述**（如“企业基本信息表”）和**物理表名**（如 `enterprise_info`），方便用户理解。
+- 用户只能从列表中选择，杜绝拼写错误。
+
+### 2.2 选项数据来源方案
+
+根据系统架构的实际情况，下拉选项的数据来源有两种实现方案：
+
+#### 方案 A：前端静态配置（适用于表结构固定的场景）
+如果能碳审计平台的数据表结构相对固定，不会频繁增加新表，可以直接在前端代码中维护一个静态的表名列表。
+
+**优点**：实现简单，无需后端接口支持，响应速度快。
+**缺点**：每次数据库新增表时，都需要修改前端代码并重新发布。
+
+#### 方案 B：后端动态获取（适用于表结构动态扩展的场景）
+如果系统支持动态建表，或者表结构经常变动，建议通过调用后端 API 获取当前可用的数据表列表。
+
+**优点**：灵活性高，数据库结构变更时前端自动同步，无需重新发布。
+**缺点**：需要后端提供一个查询可用表名的接口（如 `/api/tables`）。
+
+## 3. 代码修改指南（Vue 3 + Element Plus）
+
+以下提供基于 Vue 3 和 Element Plus 的代码修改示例，假设采用**方案 A（静态配置）**。
+
+### 3.1 定义选项数据
+在 `TemplateManage.vue` 或相关的侧边栏组件的 `<script setup>` 中，定义目标表的选项列表：
+
+```javascript
+// 目标表选项列表
+const targetTableOptions = [
+  { label: '企业基本信息表 (enterprise_info)', value: 'enterprise_info' },
+  { label: '能源消耗汇总表 (energy_consumption)', value: 'energy_consumption' },
+  { label: '节能技改项目表 (energy_saving_project)', value: 'energy_saving_project' },
+  { label: '碳排放核算表 (carbon_emission)', value: 'carbon_emission' },
+  { label: '能源审计报告表 (audit_report)', value: 'audit_report' }
+  // 请根据实际数据库结构补充完整
+];
+```
+
+### 3.2 修改模板代码
+将原来的 `<el-input>` 替换为带有搜索功能的 `<el-select>`：
+
+**修改前：**
+```vue
+<el-input 
+  v-model="item.targetTable" 
+  placeholder="目标表 (targetTable)" 
+  size="small" 
+  :disabled="isReadonly" 
+  style="margin-top: 4px;"
+/>
+```
+
+**修改后：**
+```vue
+<el-select 
+  v-model="item.targetTable" 
+  placeholder="请选择目标表 (targetTable)" 
+  size="small" 
+  filterable 
+  clearable
+  :disabled="isReadonly" 
+  style="margin-top: 4px; width: 100%;"
+>
+  <el-option
+    v-for="table in targetTableOptions"
+    :key="table.value"
+    :label="table.label"
+    :value="table.value"
+  />
+</el-select>
+```
+
+### 3.3 关键属性说明
+- `filterable`：允许用户在下拉框中输入关键字进行模糊搜索，在表数量较多时非常实用。
+- `clearable`：允许用户一键清空已选择的表名。
+- `width: 100%`：确保下拉框的宽度与原有的输入框保持一致。
+
+## 4. 总结
+
+将 `targetTable` 从手动输入改为下拉选择是一个典型的“防呆设计（Poka-yoke）”，虽然改动很小，但能极大地降低用户的配置成本和系统的运行风险。建议在下一次前端迭代中优先实施此项改进。
+
+---
+*本文档由 Manus AI 生成于 2026年4月6日。*
