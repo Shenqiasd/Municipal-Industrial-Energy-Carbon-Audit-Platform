@@ -195,11 +195,14 @@ public class SpreadsheetDataExtractor {
 
         int startRow, startCol, rowCount, colCount;
         int sheetIdx = mapping.getSheetIndex() != null ? mapping.getSheetIndex() : 0;
-        String mappingSheetName = mapping.getSheetName();
+        String preferredSheetName = mapping.getSheetName();
 
         JsonNode rangeNode = namedRanges.get(tagName);
         if (rangeNode != null) {
-            sheetIdx = rangeNode.path("sheetIndex").asInt(sheetIdx);
+            int rangeSheetIdx = rangeNode.path("sheetIndex").asInt(sheetIdx);
+            preferredSheetName = rangeSheetIdx >= 0 && rangeSheetIdx < sheetNameList.size()
+                    ? sheetNameList.get(rangeSheetIdx) : preferredSheetName;
+            sheetIdx = rangeSheetIdx;
             startRow = rangeNode.path("row").asInt(0);
             startCol = rangeNode.path("col").asInt(0);
             rowCount = rangeNode.path("rowCount").asInt(1);
@@ -215,10 +218,10 @@ public class SpreadsheetDataExtractor {
             return rows;
         }
 
-        String sheetName = resolveSheetName(sheets, sheetNameList, mappingSheetName, sheetIdx);
+        String sheetName = resolveSheetName(sheets, sheetNameList, preferredSheetName, sheetIdx);
         if (sheetName == null) {
             log.warn("extractTableData: cannot resolve sheet for tag '{}' (sheetName={}, sheetIndex={})",
-                    tagName, mappingSheetName, sheetIdx);
+                    tagName, preferredSheetName, sheetIdx);
             return rows;
         }
         JsonNode dataTable = sheets.get(sheetName).path("data").path("dataTable");
