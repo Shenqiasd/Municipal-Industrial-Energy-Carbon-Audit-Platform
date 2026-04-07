@@ -80,18 +80,48 @@ public class BusinessTablePersister {
     public void deleteBySubmissionId(String tableName, Long submissionId, String operator) {
         if (!isBusinessTable(tableName)) return;
 
-        if (!hasSubmissionId(tableName)) {
-            log.warn("Skipping deleteBySubmissionId for '{}' — column missing", tableName);
+        String sql;
+        MapSqlParameterSource params = new MapSqlParameterSource();
+        params.addValue("updateBy", operator);
+
+        if (hasSubmissionId(tableName)) {
+            sql = "UPDATE " + tableName + " SET deleted = 1, update_by = :updateBy, update_time = NOW() " +
+                    "WHERE submission_id = :submissionId AND deleted = 0";
+            params.addValue("submissionId", submissionId);
+        } else {
+            log.warn("Table '{}' missing submission_id — falling back to enterprise_id+audit_year delete", tableName);
             return;
         }
-
-        String sql = "UPDATE " + tableName + " SET deleted = 1, update_by = :updateBy, update_time = NOW() " +
-                "WHERE submission_id = :submissionId AND deleted = 0";
-        MapSqlParameterSource params = new MapSqlParameterSource();
-        params.addValue("submissionId", submissionId);
-        params.addValue("updateBy", operator);
         int deleted = jdbcTemplate.update(sql, params);
         log.debug("Soft-deleted {} rows from {} for submission {}", deleted, tableName, submissionId);
+    }
+
+    /**
+     * Unified pre-extraction delete: uses submission_id when available,
+     * falls back to enterprise_id+audit_year otherwise.
+     */
+    public void deleteForReExtraction(String tableName, Long submissionId,
+                                       Long enterpriseId, Integer auditYear, String operator) {
+        if (!isBusinessTable(tableName)) return;
+
+        if (hasSubmissionId(tableName)) {
+            deleteBySubmissionId(tableName, submissionId, operator);
+        } else {
+            deleteByEnterpriseAndYear(tableName, enterpriseId, auditYear, operator);
+        }
+    }
+
+    public void deleteByEnterpriseAndYear(String tableName, Long enterpriseId, Integer auditYear, String operator) {
+        if (!isBusinessTable(tableName)) return;
+
+        String sql = "UPDATE " + tableName + " SET deleted = 1, update_by = :updateBy, update_time = NOW() " +
+                "WHERE enterprise_id = :enterpriseId AND audit_year = :auditYear AND deleted = 0";
+        MapSqlParameterSource params = new MapSqlParameterSource();
+        params.addValue("enterpriseId", enterpriseId);
+        params.addValue("auditYear", auditYear);
+        params.addValue("updateBy", operator);
+        int deleted = jdbcTemplate.update(sql, params);
+        log.debug("Soft-deleted {} rows from {} for enterprise {} year {}", deleted, tableName, enterpriseId, auditYear);
     }
 
     public void persistScalar(String tableName, Long submissionId, Long enterpriseId,
