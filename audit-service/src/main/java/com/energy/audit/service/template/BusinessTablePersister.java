@@ -173,7 +173,6 @@ public class BusinessTablePersister {
             dbRow.put("create_by", operator);
             dbRow.put("update_by", operator);
             dbRow.put("deleted", 0);
-            fillRequiredYearColumns(tableName, dbRow, auditYear);
 
             for (Map.Entry<String, Object> entry : row.entrySet()) {
                 String key = entry.getKey();
@@ -187,6 +186,9 @@ public class BusinessTablePersister {
                     dbRow.put(colName, convertValue(entry.getValue()));
                 }
             }
+            // Fill required year columns AFTER user data so putIfAbsent
+            // restores the default when extraction provides null
+            fillRequiredYearColumns(tableName, dbRow, auditYear);
             dbRows.add(dbRow);
         }
 
