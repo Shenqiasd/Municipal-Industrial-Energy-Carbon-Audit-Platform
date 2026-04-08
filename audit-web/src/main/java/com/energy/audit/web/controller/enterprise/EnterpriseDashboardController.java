@@ -5,7 +5,10 @@ import com.energy.audit.common.result.R;
 import com.energy.audit.common.util.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,6 +30,8 @@ import java.util.Map;
 @RestController
 @RequestMapping("/enterprise/dashboard")
 public class EnterpriseDashboardController {
+
+    private static final Logger log = LoggerFactory.getLogger(EnterpriseDashboardController.class);
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -82,16 +87,15 @@ public class EnterpriseDashboardController {
             enterpriseId, auditYear, auditYear - 1));
 
         // Card 4: submission completeness
-        Integer submittedCount = jdbcTemplate.queryForObject(
+        int submittedCount = queryCount(
             "SELECT COUNT(*) FROM tpl_submission " +
             "WHERE enterprise_id = ? AND audit_year = ? AND status = 1 AND deleted = 0",
-            Integer.class, enterpriseId, auditYear);
-        Integer totalTemplateCount = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM tpl_template WHERE status = 1 AND deleted = 0",
-            Integer.class);
+            enterpriseId, auditYear);
+        int totalTemplateCount = queryCount(
+            "SELECT COUNT(*) FROM tpl_template WHERE status = 1 AND deleted = 0");
 
-        result.put("submittedCount", submittedCount != null ? submittedCount : 0);
-        result.put("totalTemplateCount", totalTemplateCount != null ? totalTemplateCount : 0);
+        result.put("submittedCount", submittedCount);
+        result.put("totalTemplateCount", totalTemplateCount);
 
         return R.ok(result);
     }
@@ -113,17 +117,17 @@ public class EnterpriseDashboardController {
         if (hasEnterpriseSetting) settingParts++;
 
         boolean hasEnergy = queryExists(
-            "SELECT 1 FROM bs_energy_setting WHERE enterprise_id = ? AND deleted = 0",
+            "SELECT 1 FROM bs_energy WHERE enterprise_id = ? AND deleted = 0",
             enterpriseId);
         if (hasEnergy) settingParts++;
 
         boolean hasUnit = queryExists(
-            "SELECT 1 FROM bs_unit_setting WHERE enterprise_id = ? AND deleted = 0",
+            "SELECT 1 FROM bs_unit WHERE enterprise_id = ? AND deleted = 0",
             enterpriseId);
         if (hasUnit) settingParts++;
 
         boolean hasProduct = queryExists(
-            "SELECT 1 FROM bs_product_setting WHERE enterprise_id = ? AND deleted = 0",
+            "SELECT 1 FROM bs_product WHERE enterprise_id = ? AND deleted = 0",
             enterpriseId);
         if (hasProduct) settingParts++;
 
@@ -132,22 +136,18 @@ public class EnterpriseDashboardController {
             settingParts + "/" + settingTotal + " 已配置"));
 
         // Stage 2: Template submission
-        Integer totalTpls = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM tpl_template WHERE status = 1 AND deleted = 0",
-            Integer.class);
-        int total = totalTpls != null ? totalTpls : 0;
+        int total = queryCount(
+            "SELECT COUNT(*) FROM tpl_template WHERE status = 1 AND deleted = 0");
 
-        Integer submittedTpls = jdbcTemplate.queryForObject(
+        int submitted = queryCount(
             "SELECT COUNT(*) FROM tpl_submission " +
             "WHERE enterprise_id = ? AND audit_year = ? AND status = 1 AND deleted = 0",
-            Integer.class, enterpriseId, auditYear);
-        int submitted = submittedTpls != null ? submittedTpls : 0;
+            enterpriseId, auditYear);
 
-        Integer draftTpls = jdbcTemplate.queryForObject(
+        int drafts = queryCount(
             "SELECT COUNT(*) FROM tpl_submission " +
             "WHERE enterprise_id = ? AND audit_year = ? AND status = 0 AND deleted = 0",
-            Integer.class, enterpriseId, auditYear);
-        int drafts = draftTpls != null ? draftTpls : 0;
+            enterpriseId, auditYear);
 
         int tplPct = 0;
         String tplDetail;
@@ -184,6 +184,9 @@ public class EnterpriseDashboardController {
             }
         } catch (EmptyResultDataAccessException e) {
             auditDetail = submitted == total && total > 0 ? "可提交审核" : "等待所有模板提交";
+        } catch (DataAccessException e) {
+            log.warn("Dashboard: failed to query aw_audit_task", e);
+            auditDetail = "等待所有模板提交";
         }
         items.add(progressItem("提交审核", auditPct, auditDetail));
 
@@ -205,6 +208,9 @@ public class EnterpriseDashboardController {
             }
         } catch (EmptyResultDataAccessException e) {
             reportDetail = "未生成";
+        } catch (DataAccessException e) {
+            log.warn("Dashboard: failed to query ar_report", e);
+            reportDetail = "未生成";
         }
         items.add(progressItem("审计报告", reportPct, reportDetail));
 
@@ -224,11 +230,29 @@ public class EnterpriseDashboardController {
             return jdbcTemplate.queryForObject(sql, BigDecimal.class, args);
         } catch (EmptyResultDataAccessException e) {
             return null;
+        } catch (DataAccessException e) {
+            log.warn("Dashboard: queryDecimal failed [{}]", sql, e);
+            return null;
         }
     }
 
     private boolean queryExists(String sql, Object... args) {
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql + " LIMIT 1", args);
-        return !rows.isEmpty();
+        try {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql + " LIMIT 1", args);
+            return !rows.isEmpty();
+        } catch (DataAccessException e) {
+            log.warn("Dashboard: queryExists failed [{}]", sql, e);
+            return false;
+        }
+    }
+
+    private int queryCount(String sql, Object... args) {
+        try {
+            Integer count = jdbcTemplate.queryForObject(sql, Integer.class, args);
+            return count != null ? count : 0;
+        } catch (DataAccessException e) {
+            log.warn("Dashboard: queryCount failed [{}]", sql, e);
+            return 0;
+        }
     }
 }
