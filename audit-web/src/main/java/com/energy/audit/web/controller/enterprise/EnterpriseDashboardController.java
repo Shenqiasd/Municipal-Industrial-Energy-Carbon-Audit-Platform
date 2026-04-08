@@ -5,8 +5,11 @@ import com.energy.audit.common.result.R;
 import com.energy.audit.common.util.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,6 +30,8 @@ import java.util.Map;
 @RestController
 @RequestMapping("/enterprise/dashboard")
 public class EnterpriseDashboardController {
+
+    private static final Logger log = LoggerFactory.getLogger(EnterpriseDashboardController.class);
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -177,8 +182,11 @@ public class EnterpriseDashboardController {
                 auditPct = 70;
                 auditDetail = "已提交，等待审核";
             }
-        } catch (DataAccessException e) {
+        } catch (EmptyResultDataAccessException e) {
             auditDetail = submitted == total && total > 0 ? "可提交审核" : "等待所有模板提交";
+        } catch (DataAccessException e) {
+            log.warn("Dashboard: failed to query aw_audit_task", e);
+            auditDetail = "等待所有模板提交";
         }
         items.add(progressItem("提交审核", auditPct, auditDetail));
 
@@ -198,7 +206,10 @@ public class EnterpriseDashboardController {
                 reportPct = 50;
                 reportDetail = "报告生成中";
             }
+        } catch (EmptyResultDataAccessException e) {
+            reportDetail = "未生成";
         } catch (DataAccessException e) {
+            log.warn("Dashboard: failed to query ar_report", e);
             reportDetail = "未生成";
         }
         items.add(progressItem("审计报告", reportPct, reportDetail));
@@ -217,7 +228,10 @@ public class EnterpriseDashboardController {
     private BigDecimal queryDecimal(String sql, Object... args) {
         try {
             return jdbcTemplate.queryForObject(sql, BigDecimal.class, args);
+        } catch (EmptyResultDataAccessException e) {
+            return null;
         } catch (DataAccessException e) {
+            log.warn("Dashboard: queryDecimal failed [{}]", sql, e);
             return null;
         }
     }
@@ -227,6 +241,7 @@ public class EnterpriseDashboardController {
             List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql + " LIMIT 1", args);
             return !rows.isEmpty();
         } catch (DataAccessException e) {
+            log.warn("Dashboard: queryExists failed [{}]", sql, e);
             return false;
         }
     }
@@ -236,6 +251,7 @@ public class EnterpriseDashboardController {
             Integer count = jdbcTemplate.queryForObject(sql, Integer.class, args);
             return count != null ? count : 0;
         } catch (DataAccessException e) {
+            log.warn("Dashboard: queryCount failed [{}]", sql, e);
             return 0;
         }
     }
