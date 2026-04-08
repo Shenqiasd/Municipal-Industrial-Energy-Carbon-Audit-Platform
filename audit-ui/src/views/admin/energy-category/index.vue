@@ -119,7 +119,8 @@ onMounted(loadData)
       <el-table-column prop="name" label="品种名称" min-width="140" />
       <el-table-column prop="category" label="品类" width="120" />
       <el-table-column prop="measurementUnit" label="计量单位" width="100" />
-      <el-table-column prop="equivalentValue" label="折标煤系数" width="120" />
+      <el-table-column prop="equivalentValue" label="折标系数(当量值)" width="140" />
+      <el-table-column prop="equalValue" label="折标系数(等价值)" width="140" />
       <el-table-column prop="carbonContent" label="含碳量" width="100" />
       <el-table-column prop="oxidationRate" label="氧化率" width="90" />
       <el-table-column prop="isActive" label="状态" width="80">
@@ -161,10 +162,17 @@ onMounted(loadData)
         </el-form-item>
         <el-row :gutter="16">
           <el-col :span="12">
-            <el-form-item label="折标煤系数">
+            <el-form-item label="折标系数(当量值)">
               <el-input-number v-model="form.equivalentValue" :precision="4" :min="0" style="width:100%" />
             </el-form-item>
           </el-col>
+          <el-col :span="12">
+            <el-form-item label="折标系数(等价值)">
+              <el-input-number v-model="form.equalValue" :precision="4" :min="0" style="width:100%" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
           <el-col :span="12">
             <el-form-item label="低位热值">
               <el-input-number v-model="form.lowHeatValue" :precision="4" :min="0" style="width:100%" />

@@ -140,7 +140,8 @@ onMounted(loadData)
       <el-table-column prop="name" label="能源名称" min-width="140" />
       <el-table-column prop="category" label="品类" width="120" />
       <el-table-column prop="measurementUnit" label="计量单位" width="100" />
-      <el-table-column prop="equivalentValue" label="折标煤系数" width="110" />
+      <el-table-column prop="equivalentValue" label="折标系数(当量值)" width="130" />
+      <el-table-column prop="equalValue" label="折标系数(等价值)" width="130" />
       <el-table-column prop="carbonContent" label="含碳量" width="100" />
       <el-table-column prop="isActive" label="状态" width="80">
         <template #default="{ row }">
@@ -178,10 +179,17 @@ onMounted(loadData)
         </el-form-item>
         <el-row :gutter="16">
           <el-col :span="12">
-            <el-form-item label="折标煤系数">
+            <el-form-item label="折标系数(当量值)">
               <el-input-number v-model="form.equivalentValue" :precision="4" :min="0" style="width:100%" />
             </el-form-item>
           </el-col>
+          <el-col :span="12">
+            <el-form-item label="折标系数(等价值)">
+              <el-input-number v-model="form.equalValue" :precision="4" :min="0" style="width:100%" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
           <el-col :span="12">
             <el-form-item label="含碳量">
               <el-input-number v-model="form.carbonContent" :precision="4" :min="0" style="width:100%" />
@@ -215,7 +223,8 @@ onMounted(loadData)
         <el-table-column prop="name" label="品种名称" min-width="140" />
         <el-table-column prop="category" label="品类" width="110" />
         <el-table-column prop="measurementUnit" label="单位" width="90" />
-        <el-table-column prop="equivalentValue" label="折标煤" width="90" />
+        <el-table-column prop="equivalentValue" label="当量值" width="90" />
+        <el-table-column prop="equalValue" label="等价值" width="90" />
       </el-table>
       <template #footer>
         <el-button @click="importDialogVisible = false">取消</el-button>
