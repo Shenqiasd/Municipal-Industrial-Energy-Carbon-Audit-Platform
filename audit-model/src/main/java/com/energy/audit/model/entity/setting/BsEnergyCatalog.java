@@ -27,10 +27,10 @@ public class BsEnergyCatalog extends BaseEntity {
     /** Measurement unit */
     private String measurementUnit;
 
-    /** Standard coal equivalent value (折标系数等价值) */
+    /** Standard coal conversion factor — calorific (折标系数当量值) */
     private BigDecimal equivalentValue;
 
-    /** Equal value (折标系数当量值) */
+    /** Standard coal conversion factor — equivalent (折标系数等价值) */
     private BigDecimal equalValue;
 
     /** Low heat value */
