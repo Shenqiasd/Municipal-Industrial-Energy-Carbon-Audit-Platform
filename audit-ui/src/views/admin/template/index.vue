@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Edit, Delete, Upload, View } from '@element-plus/icons-vue'
+import { Plus, Edit, Delete, Upload, View, CircleClose } from '@element-plus/icons-vue'
 import SpreadDesigner from '@/components/SpreadDesigner/index.vue'
 import ColumnMappingEditor from '@/components/ColumnMappingEditor.vue'
 import { getTableOptions, getFieldOptions } from '@/config/schema-registry'
@@ -257,6 +257,16 @@ function handleDesignerClose() {
 
 const isReadonly = (v: TplTemplateVersion | null) => v?.published === 1
 
+async function handleDeleteTag(tag: TplTagMapping, index: number) {
+  await ElMessageBox.confirm(
+    `确认删除字段映射「${tag.tagName}」？删除后需点击「保存映射配置」才会生效。`,
+    '删除确认',
+    { type: 'warning' }
+  )
+  designerTags.value.splice(index, 1)
+  ElMessage.success('已移除，请点击「保存映射配置」以持久化')
+}
+
 // ── Direct "设计" shortcut: open latest draft version for a template ──────────
 async function openLatestDesigner(row: TplTemplate) {
   activeTemplate.value = row
@@ -471,7 +481,18 @@ onMounted(loadData)
                 class="tag-item"
               >
                 <div class="tag-header">
-                  <el-tag size="small" type="info">{{ tag.tagName }}</el-tag>
+                  <div class="tag-name-row">
+                    <el-tag size="small" type="info">{{ tag.tagName }}</el-tag>
+                    <el-button
+                      v-if="!isReadonly(designerVersion)"
+                      :icon="CircleClose"
+                      type="danger"
+                      size="small"
+                      link
+                      class="tag-delete-btn"
+                      @click="handleDeleteTag(tag, designerTags.indexOf(tag))"
+                    />
+                  </div>
                   <div class="tag-badges">
                     <el-tag size="small" :type="tag.sourceType === 'NAMED_RANGE' ? 'success' : 'warning'" effect="plain">
                       {{ SOURCE_TYPE_LABELS[tag.sourceType ?? 'CELL_TAG'] ?? tag.sourceType }}
@@ -725,6 +746,17 @@ onMounted(loadData)
   align-items: center;
   justify-content: space-between;
   margin-bottom: 2px;
+}
+
+.tag-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tag-delete-btn {
+  padding: 2px !important;
+  font-size: 14px;
 }
 
 .tag-badges {
