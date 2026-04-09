@@ -7,7 +7,8 @@ server {
     # Dynamic DNS resolution: re-resolve backend hostname on each request
     # instead of caching at startup. Prevents proxy failures when backend
     # redeploys and gets a new internal IP while frontend is already running.
-    resolver 127.0.0.11 valid=10s ipv6=off;
+    # DNS_RESOLVER is auto-detected from /etc/resolv.conf by docker-entrypoint.sh
+    resolver ${DNS_RESOLVER} valid=10s ipv6=off;
     resolver_timeout 5s;
 
     location / {
