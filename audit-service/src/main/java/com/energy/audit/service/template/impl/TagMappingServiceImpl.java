@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -79,9 +80,20 @@ public class TagMappingServiceImpl implements TagMappingService {
                         }
                 ));
 
+        // Fetch soft-deleted tag names so we don't re-create mappings the user intentionally removed
+        Set<String> deletedTagNames = tagMappingMapper.selectDeletedTagNamesByVersionId(versionId)
+                .stream()
+                .collect(Collectors.toSet());
+
         for (Map.Entry<String, DiscoveredField> entry : discoveredByTag.entrySet()) {
             String tagName = entry.getKey();
             DiscoveredField df = entry.getValue();
+
+            // Skip tags that were explicitly deleted by the user via the mapping panel
+            if (deletedTagNames.contains(tagName)) {
+                log.debug("syncFromTemplateJson: skipping re-creation of user-deleted tag '{}' for versionId={}", tagName, versionId);
+                continue;
+            }
 
             if (!existingByTag.containsKey(tagName)) {
                 TplTagMapping m = new TplTagMapping();

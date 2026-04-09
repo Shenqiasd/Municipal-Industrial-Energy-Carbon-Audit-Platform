@@ -33,4 +33,7 @@ public interface TplTagMappingMapper {
 
     /** Insert a single mapping (for sync upsert) */
     int insert(TplTagMapping mapping);
+
+    /** Return tag_name values that were soft-deleted for a version (used to avoid re-creating user-deleted mappings during sync) */
+    List<String> selectDeletedTagNamesByVersionId(@Param("templateVersionId") Long templateVersionId);
 }

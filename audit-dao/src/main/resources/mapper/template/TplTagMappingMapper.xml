@@ -126,4 +126,9 @@
         )
     </insert>
 
+    <select id="selectDeletedTagNamesByVersionId" resultType="string">
+        SELECT tag_name FROM tpl_tag_mapping
+        WHERE template_version_id = #{templateVersionId} AND deleted = 1
+    </select>
+
 </mapper>
