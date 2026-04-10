@@ -4,6 +4,7 @@ import com.energy.audit.model.entity.system.SysDictData;
 import com.energy.audit.model.entity.system.SysDictType;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * System dictionary service
@@ -27,6 +28,8 @@ public interface SysDictService {
     List<SysDictData> listData(SysDictData query);
 
     List<SysDictData> getDataByType(String dictType);
+
+    Map<String, List<SysDictData>> getDataByTypes(List<String> dictTypes);
 
     void createData(SysDictData dictData);
 

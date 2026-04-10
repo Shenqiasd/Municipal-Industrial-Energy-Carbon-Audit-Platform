@@ -19,6 +19,17 @@ export interface GCSpreadNameInfo {
   getColumn(): number
 }
 
+export interface GCDataValidator {
+  inCellDropdown(value: boolean): void
+  showInputMessage(value: boolean): void
+  inputTitle(title: string): void
+  inputMessage(msg: string): void
+}
+
+export interface GCDataValidation {
+  createListValidator(list: string): GCDataValidator
+}
+
 export interface GCSpreadSheet {
   options: {
     isProtected: boolean
@@ -27,7 +38,9 @@ export interface GCSpreadSheet {
   getColumnCount(): number
   getTag(row: number, col: number): unknown
   setValue(row: number, col: number, value: unknown): void
+  setDataValidator(row: number, col: number, validator: GCDataValidator): void
   getCustomName(name: string): GCSpreadNameInfo | null
+  name(): string
 }
 
 export interface GCSpreadWorkbook {
@@ -64,6 +77,7 @@ export interface GCSpreadSheetsWorkbookConstructor {
 export interface GCSpreadSheets {
   Workbook: GCSpreadSheetsWorkbookConstructor
   Designer: GCSpreadDesignerConstructor | { Designer: GCSpreadDesignerConstructor; DefaultConfig: object }
+  DataValidation: GCDataValidation
   LicenseKey: string
 }
 

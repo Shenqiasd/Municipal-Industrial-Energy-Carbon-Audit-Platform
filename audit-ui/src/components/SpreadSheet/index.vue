@@ -12,6 +12,7 @@ import {
   type TplTagMapping,
 } from '@/api/template'
 import { getEnterpriseSettingPrefill } from '@/api/enterpriseSetting'
+import { getDataByTypes, type DictData } from '@/api/dict'
 import { initSpreadJSLicense } from '@/utils/spreadjs-license'
 
 const props = defineProps<{
@@ -96,6 +97,11 @@ async function initWorkbook() {
     // Pre-fill enterprise settings into tagged cells when loading a fresh template
     if (!currentSubmission && publishedVersion.id) {
       await prefillEnterpriseSettings(workbook, publishedVersion.id)
+    }
+
+    // Inject dictionary-based dropdown validators for EQUIPMENT_BENCHMARK and TABLE tags
+    if (publishedVersion.id) {
+      await applyDictValidators(workbook, publishedVersion.id)
     }
 
     const forceReadonly = props.readonly || currentSubmission?.status === 1
@@ -215,6 +221,148 @@ function fillTaggedCell(
   }
 
   return false
+}
+
+/**
+ * Inject SpreadJS DataValidation dropdowns for columns that have dictType
+ * configured in EQUIPMENT_BENCHMARK or TABLE tag mappings' columnMappings.
+ * This enforces selection from dictionary values (no free text).
+ */
+async function applyDictValidators(
+  wb: import('@/types/spreadjs').GCSpreadWorkbook,
+  versionId: number,
+) {
+  try {
+    const tags = await listTags(versionId)
+    // Collect all dictType references from EQUIPMENT_BENCHMARK columnMappings
+    const dictTypesNeeded = new Set<string>()
+    interface DropdownTarget {
+      sheetName?: string
+      sheetIndex?: number
+      startRow: number
+      endRow: number
+      col: number
+      dictType: string
+    }
+    const targets: DropdownTarget[] = []
+
+    for (const tag of tags) {
+      if (tag.mappingType !== 'EQUIPMENT_BENCHMARK' || !tag.columnMappings || !tag.cellRange) continue
+
+      let colMapRoot: Record<string, unknown>
+      try {
+        colMapRoot = JSON.parse(tag.columnMappings)
+      } catch {
+        continue
+      }
+
+      // Parse cellRange to get row bounds (e.g. "A4:AJ200")
+      const rangeMatch = tag.cellRange.match(/([A-Z]+)(\d+):([A-Z]+)(\d+)/)
+      if (!rangeMatch) continue
+      const startRow = parseInt(rangeMatch[2]) - 1 // 0-based
+      const endRow = parseInt(rangeMatch[4]) - 1
+      const startCol = letterToColIndex(rangeMatch[1])
+
+      // Scan commonColumns and typeColumns for dictType fields
+      const allColMaps: Array<{ col: number; dictType?: string }> = []
+      const commonCols = colMapRoot.commonColumns as Array<Record<string, unknown>> | undefined
+      if (Array.isArray(commonCols)) {
+        for (const cm of commonCols) {
+          if (cm.dictType) allColMaps.push({ col: cm.col as number, dictType: cm.dictType as string })
+        }
+      }
+      const typeCols = colMapRoot.typeColumns as Record<string, Array<Record<string, unknown>>> | undefined
+      if (typeCols && typeof typeCols === 'object') {
+        for (const cols of Object.values(typeCols)) {
+          if (!Array.isArray(cols)) continue
+          for (const cm of cols) {
+            if (cm.dictType) allColMaps.push({ col: cm.col as number, dictType: cm.dictType as string })
+          }
+        }
+      }
+
+      // Deduplicate by col+dictType and build targets
+      const seen = new Set<string>()
+      for (const cm of allColMaps) {
+        const key = `${cm.col}:${cm.dictType}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        dictTypesNeeded.add(cm.dictType!)
+        targets.push({
+          sheetName: tag.sheetName,
+          sheetIndex: tag.sheetIndex,
+          startRow,
+          endRow,
+          col: startCol + cm.col,
+          dictType: cm.dictType!,
+        })
+      }
+    }
+
+    if (dictTypesNeeded.size === 0 || targets.length === 0) return
+
+    // Fetch all needed dictionary data in one batch call
+    const dictMap = await getDataByTypes([...dictTypesNeeded])
+    if (!dictMap || Object.keys(dictMap).length === 0) return
+
+    const DataValidation = window.GC?.Spread?.Sheets?.DataValidation
+    if (!DataValidation) {
+      console.warn('[dropdown] SpreadJS DataValidation not available')
+      return
+    }
+
+    wb.suspendPaint()
+    try {
+      for (const target of targets) {
+        const items: DictData[] = dictMap[target.dictType] ?? []
+        if (items.length === 0) continue
+
+        const listStr = items.map((d) => d.dictLabel).join(',')
+        const dv = DataValidation.createListValidator(listStr)
+        dv.inCellDropdown(true)
+        dv.showInputMessage(true)
+        dv.inputTitle('请选择')
+        dv.inputMessage('点击下拉箭头选择')
+
+        // Find target sheet
+        const sheet = findSheet(wb, target.sheetName, target.sheetIndex)
+        if (!sheet) continue
+
+        for (let r = target.startRow; r <= target.endRow; r++) {
+          sheet.setDataValidator(r, target.col, dv)
+        }
+      }
+    } finally {
+      wb.resumePaint()
+    }
+  } catch (e) {
+    // Dropdown injection is best-effort; don't block template loading
+    console.warn('[dropdown] failed to apply dict validators:', e)
+  }
+}
+
+function findSheet(
+  wb: import('@/types/spreadjs').GCSpreadWorkbook,
+  sheetName?: string,
+  sheetIndex?: number,
+): import('@/types/spreadjs').GCSpreadSheet | null {
+  const count = wb.getSheetCount()
+  if (sheetName) {
+    for (let i = 0; i < count; i++) {
+      const s = wb.getSheet(i)
+      if (s.name() === sheetName) return s
+    }
+  }
+  const idx = sheetIndex ?? 0
+  return idx >= 0 && idx < count ? wb.getSheet(idx) : null
+}
+
+function letterToColIndex(letters: string): number {
+  let col = 0
+  for (let i = 0; i < letters.length; i++) {
+    col = col * 26 + (letters.charCodeAt(i) - 64)
+  }
+  return col - 1 // 0-based
 }
 
 function releaseLockIfOwned() {
