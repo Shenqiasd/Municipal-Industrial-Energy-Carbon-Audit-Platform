@@ -1239,6 +1239,31 @@ CREATE TABLE IF NOT EXISTS de_equipment_benchmark (
     PRIMARY KEY (id)
 );
 
+-- de_equipment_summary (Audit08: 主要耗能设备状况表)
+CREATE TABLE IF NOT EXISTS de_equipment_summary (
+    id                      BIGINT        NOT NULL AUTO_INCREMENT,
+    enterprise_id           BIGINT        NOT NULL,
+    audit_year              INT           NOT NULL,
+    submission_id           BIGINT        DEFAULT NULL,
+    device_name             VARCHAR(128)  DEFAULT NULL,
+    category                VARCHAR(64)   DEFAULT NULL,
+    model                   VARCHAR(128)  DEFAULT NULL,
+    capacity                VARCHAR(64)   DEFAULT NULL,
+    quantity                INT           DEFAULT NULL,
+    device_overview         CLOB          DEFAULT NULL,
+    obsolete_update_info    CLOB          DEFAULT NULL,
+    install_location        VARCHAR(256)  DEFAULT NULL,
+    energy_efficiency_level VARCHAR(128)  DEFAULT NULL,
+    annual_runtime_hours    DECIMAL(10,2) DEFAULT NULL,
+    remark                  VARCHAR(512)  DEFAULT NULL,
+    create_by               VARCHAR(64)   DEFAULT NULL,
+    create_time             DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_by               VARCHAR(64)   DEFAULT NULL,
+    update_time             DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted                 TINYINT       NOT NULL DEFAULT 0,
+    PRIMARY KEY (id)
+);
+
 -- ar_report (audit report records)
 CREATE TABLE IF NOT EXISTS ar_report (
     id                     BIGINT        NOT NULL AUTO_INCREMENT,
