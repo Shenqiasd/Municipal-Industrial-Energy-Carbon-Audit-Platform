@@ -347,7 +347,7 @@ CREATE TABLE IF NOT EXISTS tpl_tag_mapping (
     sheet_index         INT          DEFAULT 0,
     sheet_name          VARCHAR(128),
     cell_range          VARCHAR(32),
-    mapping_type        VARCHAR(16)  DEFAULT 'SCALAR',
+    mapping_type        VARCHAR(32)  DEFAULT 'SCALAR',
     source_type         VARCHAR(16)  DEFAULT 'CELL_TAG',
     row_key_column      INT,
     column_mappings     CLOB,
