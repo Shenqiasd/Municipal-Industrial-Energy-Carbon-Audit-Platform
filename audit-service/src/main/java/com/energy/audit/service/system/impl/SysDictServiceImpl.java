@@ -14,7 +14,9 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * System dictionary service implementation with Ehcache caching
@@ -106,6 +108,18 @@ public class SysDictServiceImpl implements SysDictService {
     @Cacheable(value = "dictCache", key = "#dictType")
     public List<SysDictData> getDataByType(String dictType) {
         return dictDataMapper.selectByDictType(dictType);
+    }
+
+    @Override
+    public Map<String, List<SysDictData>> getDataByTypes(List<String> dictTypes) {
+        Map<String, List<SysDictData>> result = new HashMap<>();
+        if (dictTypes == null) return result;
+        for (String dt : dictTypes) {
+            if (dt != null && !dt.isBlank()) {
+                result.put(dt, getDataByType(dt));
+            }
+        }
+        return result;
     }
 
     @Override

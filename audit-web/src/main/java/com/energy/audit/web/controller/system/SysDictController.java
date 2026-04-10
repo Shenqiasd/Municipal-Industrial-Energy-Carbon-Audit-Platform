@@ -19,7 +19,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 /**
  * System dictionary controller
@@ -90,6 +92,16 @@ public class SysDictController {
         List<SysDictData> list = sysDictService.listData(query);
         PageInfo<SysDictData> pageInfo = new PageInfo<>(list);
         return R.ok(PageResult.of(pageInfo.getTotal(), pageInfo.getList()));
+    }
+
+    @Operation(summary = "Batch get dict data by multiple types (cached)")
+    @GetMapping("/data/batch")
+    public R<Map<String, List<SysDictData>>> getDataByTypes(@RequestParam String types) {
+        List<String> typeList = Arrays.stream(types.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+        return R.ok(sysDictService.getDataByTypes(typeList));
     }
 
     @Operation(summary = "Get dict data by type (cached)")

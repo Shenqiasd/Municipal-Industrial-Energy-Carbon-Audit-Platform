@@ -49,7 +49,18 @@ public class SpreadsheetDataExtractor {
                 String tagName = mapping.getTagName();
                 String mappingType = mapping.getMappingType() != null ? mapping.getMappingType() : "SCALAR";
 
-                if ("TABLE".equalsIgnoreCase(mappingType)) {
+                if ("EQUIPMENT_BENCHMARK".equalsIgnoreCase(mappingType)) {
+                    List<Map<String, Object>> benchmarkData = extractEquipmentBenchmark(
+                            sheets, sheetNameList, namedRanges, mapping);
+
+                    if (mapping.getRequired() != null && mapping.getRequired() == 1 && benchmarkData.isEmpty()) {
+                        throw new BusinessException("必填表格 [" + mapping.getFieldName() + "] 无有效数据行");
+                    }
+
+                    result.put(mapping.getFieldName(), benchmarkData);
+                    log.debug("Extracted EQUIPMENT_BENCHMARK: {} tag: {} rows: {}", mapping.getFieldName(), tagName,
+                            benchmarkData.size());
+                } else if ("TABLE".equalsIgnoreCase(mappingType)) {
                     List<Map<String, Object>> tableData = extractTableData(
                             sheets, sheetNameList, namedRanges, mapping);
 
@@ -269,6 +280,165 @@ public class SpreadsheetDataExtractor {
         }
 
         return rows;
+    }
+
+    // ── EQUIPMENT_BENCHMARK extraction ─────────────────────────────────────────
+
+    /**
+     * Custom extractor for Audit06 "重点用能设备能效对标表".
+     * Scans the data area row-by-row, using column B (sectionHeaderCol) to detect
+     * device-type section headers (e.g. "水泵", "空压机"). For each data row,
+     * applies the device-type-specific columnMappings from the extended JSON format.
+     *
+     * columnMappings JSON format:
+     * {
+     *   "sectionHeaders": {"水泵": "PUMP", "空压机": "COMPRESSOR", ...},
+     *   "sectionHeaderCol": 1,
+     *   "commonColumns": [{col, field, type}, ...],
+     *   "typeColumns": {"PUMP": [{col, field, type}, ...], ...}
+     * }
+     */
+    private List<Map<String, Object>> extractEquipmentBenchmark(
+            JsonNode sheets, List<String> sheetNameList,
+            Map<String, JsonNode> namedRanges, TplTagMapping mapping) {
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+
+        // 1. Resolve cell range
+        int startRow, startCol, rowCount, colCount;
+        int sheetIdx = mapping.getSheetIndex() != null ? mapping.getSheetIndex() : 0;
+        String preferredSheetName = mapping.getSheetName();
+
+        if (mapping.getCellRange() != null && !mapping.getCellRange().isBlank()) {
+            int[] parsed = parseCellRange(mapping.getCellRange());
+            startRow = parsed[0];
+            startCol = parsed[1];
+            rowCount = parsed[2] - parsed[0] + 1;
+            colCount = parsed[3] - parsed[1] + 1;
+        } else {
+            log.warn("EQUIPMENT_BENCHMARK mapping '{}' has no cellRange configured", mapping.getTagName());
+            return rows;
+        }
+
+        String sheetName = resolveSheetName(sheets, sheetNameList, preferredSheetName, sheetIdx);
+        if (sheetName == null) {
+            log.warn("extractEquipmentBenchmark: cannot resolve sheet (sheetName={}, sheetIndex={})",
+                    preferredSheetName, sheetIdx);
+            return rows;
+        }
+        JsonNode dataTable = sheets.get(sheetName).path("data").path("dataTable");
+
+        // 2. Parse extended columnMappings JSON
+        String colMapJson = mapping.getColumnMappings();
+        if (colMapJson == null || colMapJson.isBlank()) {
+            log.warn("EQUIPMENT_BENCHMARK mapping '{}' has no columnMappings", mapping.getTagName());
+            return rows;
+        }
+
+        JsonNode colMapRoot;
+        try {
+            colMapRoot = objectMapper.readTree(colMapJson);
+        } catch (Exception e) {
+            throw new BusinessException("EQUIPMENT_BENCHMARK columnMappings JSON 格式无效: " + e.getMessage());
+        }
+
+        // Parse sectionHeaders: {"水泵": "PUMP", ...}
+        Map<String, String> sectionHeaders = new HashMap<>();
+        JsonNode shNode = colMapRoot.get("sectionHeaders");
+        if (shNode != null && shNode.isObject()) {
+            shNode.fields().forEachRemaining(entry -> sectionHeaders.put(entry.getKey(), entry.getValue().asText()));
+        }
+
+        int sectionHeaderCol = colMapRoot.path("sectionHeaderCol").asInt(1); // default col B
+
+        // Parse commonColumns
+        List<ColumnMapping> commonCols = parseColumnMappingsFromNode(colMapRoot.get("commonColumns"));
+
+        // Parse typeColumns: {"PUMP": [...], ...}
+        Map<String, List<ColumnMapping>> typeCols = new HashMap<>();
+        JsonNode tcNode = colMapRoot.get("typeColumns");
+        if (tcNode != null && tcNode.isObject()) {
+            tcNode.fields().forEachRemaining(entry ->
+                    typeCols.put(entry.getKey(), parseColumnMappingsFromNode(entry.getValue())));
+        }
+
+        // 3. Scan rows, detect sections, extract data
+        String currentEquipmentType = null;
+
+        for (int r = startRow; r < startRow + rowCount; r++) {
+            JsonNode rowNode = dataTable.path(String.valueOf(r));
+            if (rowNode.isMissingNode()) continue;
+
+            // Read the section header column value
+            int absHeaderCol = startCol + sectionHeaderCol;
+            Object headerVal = extractCellValue(rowNode.path(String.valueOf(absHeaderCol)));
+            String headerStr = headerVal != null ? headerVal.toString().trim() : "";
+
+            // Check if this row is a section header
+            boolean isSectionHeader = false;
+            if (!headerStr.isEmpty()) {
+                for (Map.Entry<String, String> entry : sectionHeaders.entrySet()) {
+                    if (headerStr.contains(entry.getKey())) {
+                        currentEquipmentType = entry.getValue();
+                        isSectionHeader = true;
+                        log.debug("Detected section header at row {}: '{}' → {}", r, headerStr, currentEquipmentType);
+                        break;
+                    }
+                }
+            }
+
+            if (isSectionHeader) continue;
+            if (currentEquipmentType == null) continue;
+
+            // Check if this is a data row (has any non-empty cell beyond the header col)
+            boolean hasAnyValue = false;
+            Map<String, Object> rowData = new HashMap<>();
+            rowData.put("equipment_type", currentEquipmentType);
+
+            // Apply common columns
+            for (ColumnMapping cm : commonCols) {
+                int absCol = startCol + cm.col;
+                Object val = extractCellValue(rowNode.path(String.valueOf(absCol)));
+                val = convertType(val, cm.type);
+                if (val != null) hasAnyValue = true;
+                rowData.put(cm.field, val);
+            }
+
+            // Apply type-specific columns
+            List<ColumnMapping> specificCols = typeCols.get(currentEquipmentType);
+            if (specificCols != null) {
+                for (ColumnMapping cm : specificCols) {
+                    int absCol = startCol + cm.col;
+                    Object val = extractCellValue(rowNode.path(String.valueOf(absCol)));
+                    val = convertType(val, cm.type);
+                    if (val != null) hasAnyValue = true;
+                    rowData.put(cm.field, val);
+                }
+            }
+
+            if (hasAnyValue) {
+                rows.add(rowData);
+            }
+        }
+
+        log.info("extractEquipmentBenchmark: extracted {} rows across {} device types from sheet '{}'",
+                rows.size(), typeCols.size(), sheetName);
+        return rows;
+    }
+
+    private List<ColumnMapping> parseColumnMappingsFromNode(JsonNode node) {
+        if (node == null || !node.isArray()) return List.of();
+        List<ColumnMapping> result = new ArrayList<>();
+        for (JsonNode item : node) {
+            ColumnMapping cm = new ColumnMapping();
+            cm.col = item.path("col").asInt(0);
+            cm.field = item.path("field").asText(null);
+            cm.type = item.path("type").asText(null);
+            if (cm.field != null && !cm.field.isBlank()) {
+                result.add(cm);
+            }
+        }
+        return result;
     }
 
     // ── Private helpers ────────────────────────────────────────────────────────

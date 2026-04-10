@@ -71,6 +71,10 @@ export function getDataByType(dictType: string): Promise<DictData[]> {
   return request.get(`/system/dicts/data/${dictType}`)
 }
 
+export function getDataByTypes(types: string[]): Promise<Record<string, DictData[]>> {
+  return request.get('/system/dicts/data/batch', { params: { types: types.join(',') } })
+}
+
 export function createData(data: Partial<DictData>): Promise<void> {
   return request.post('/system/dicts/data', data)
 }
