@@ -30,7 +30,7 @@ public class BusinessTablePersister {
             "de_product_energy_cost", "de_saving_calculation", "de_management_policy",
             "de_saving_potential", "de_management_suggestion", "de_tech_reform_suggestion",
             "de_rectification", "de_report_text", "de_equipment_benchmark",
-            "de_equipment_summary"
+            "de_equipment_summary", "de_equipment_test"
     );
 
     private static final Set<String> SYSTEM_COLUMNS = Set.of(
