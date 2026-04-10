@@ -199,6 +199,13 @@ const COL_LABELS: Record<string, string> = {
   device_overview: '设备概况',
   obsolete_update_info: '淘汰更新情况',
   energy_efficiency_level: '设备对标情况(能效级别)',
+  // de_equipment_test (重点设备测试数据)
+  device_no: '设备编号',
+  test_indicator_name: '测试指标名称',
+  qualified_value: '合格值或限额',
+  judgement: '判别',
+  test_date: '测试日期',
+  area: '所属区域',
   source_unit: '来源单元',
   target_unit: '目标单元',
   energy_product: '能源产品',
@@ -242,7 +249,7 @@ const NUMERIC_COLS = new Set([
   'l1_standard_rate', 'l1_required_count', 'l1_actual_count', 'l1_actual_rate',
   'l2_standard_rate', 'l2_required_count', 'l2_actual_count', 'l2_actual_rate',
   'l3_standard_rate', 'l3_required_count', 'l3_actual_count', 'l3_actual_rate',
-  'decline_rate', 'indicator_value', 'actual_value',
+  'qualified_value', 'decline_rate', 'indicator_value', 'actual_value',
   'energy_control_total', 'product_unit_consumption', 'saving_amount',
   'energy_equiv', 'energy_equal', 'unit_energy_equiv', 'unit_energy_equal',
 ])

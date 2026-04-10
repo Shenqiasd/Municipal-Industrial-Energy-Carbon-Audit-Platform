@@ -1264,6 +1264,31 @@ CREATE TABLE IF NOT EXISTS de_equipment_summary (
     PRIMARY KEY (id)
 );
 
+-- de_equipment_test (Audit09: 重点设备测试数据)
+CREATE TABLE IF NOT EXISTS de_equipment_test (
+    id                  BIGINT         NOT NULL AUTO_INCREMENT,
+    enterprise_id       BIGINT         NOT NULL,
+    audit_year          INT            NOT NULL,
+    submission_id       BIGINT         DEFAULT NULL,
+    device_no           VARCHAR(64)    DEFAULT NULL,
+    device_name         VARCHAR(128)   DEFAULT NULL,
+    model_spec          VARCHAR(128)   DEFAULT NULL,
+    test_indicator_name VARCHAR(128)   DEFAULT NULL,
+    measurement_unit    VARCHAR(32)    DEFAULT NULL,
+    qualified_value     DECIMAL(18,6)  DEFAULT NULL,
+    actual_value        DECIMAL(18,6)  DEFAULT NULL,
+    test_date           DATE           DEFAULT NULL,
+    area                VARCHAR(64)    DEFAULT NULL,
+    judgement           VARCHAR(32)    DEFAULT NULL,
+    remark              VARCHAR(512)   DEFAULT NULL,
+    create_by           VARCHAR(64)    DEFAULT NULL,
+    create_time         DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_by           VARCHAR(64)    DEFAULT NULL,
+    update_time         DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted             TINYINT        NOT NULL DEFAULT 0,
+    PRIMARY KEY (id)
+);
+
 -- ar_report (audit report records)
 CREATE TABLE IF NOT EXISTS ar_report (
     id                     BIGINT        NOT NULL AUTO_INCREMENT,

@@ -52,6 +52,7 @@ public class ExtractedDataController {
         TABLE_LABELS.put("de_meter_config_rate",        "计量器具配备率");
         TABLE_LABELS.put("de_equipment_benchmark",      "重点用能设备能效对标");
         TABLE_LABELS.put("de_equipment_summary",        "主要用能设备汇总");
+        TABLE_LABELS.put("de_equipment_test",           "重点设备测试数据");
         TABLE_LABELS.put("de_obsolete_equipment",       "淘汰设备");
         TABLE_LABELS.put("de_product_energy_cost",      "产品能源成本");
         TABLE_LABELS.put("de_saving_calculation",       "节能量计算");
