@@ -5,4 +5,4 @@
 -- Already executed on production via direct DDL on 2026-04-10.
 -- ============================================================
 
-ALTER TABLE tpl_tag_mapping MODIFY COLUMN mapping_type VARCHAR(32) NOT NULL DEFAULT 'SCALAR';
+ALTER TABLE tpl_tag_mapping MODIFY COLUMN mapping_type VARCHAR(32) DEFAULT 'SCALAR';
