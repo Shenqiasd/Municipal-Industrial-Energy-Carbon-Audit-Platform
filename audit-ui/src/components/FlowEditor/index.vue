@@ -43,17 +43,27 @@ const ENERGY_COLORS: Record<string, string> = {
   '蒸汽': '#27AE60',
   '原煤': '#2C3E50',
   '煤炭': '#2C3E50',
+  '无烟煤': '#34495E',
+  '烟煤': '#5D6D7E',
+  '洗精煤': '#283747',
+  '焦炭': '#1B2631',
+  '焦炉煤气': '#7D3C98',
+  '高炉煤气': '#6C3483',
+  '转炉煤气': '#5B2C6F',
+  '煤制品': '#4A235A',
   '柴油': '#F39C12',
   '汽油': '#E67E22',
   '燃料油': '#D35400',
   '液化石油气': '#9B59B6',
   '热力': '#E91E63',
+  '余热': '#C2185B',
   '太阳能': '#FF9800',
   '综合能源': '#607D8B',
   '外购热力': '#E91E63',
   '压缩空气': '#1ABC9C',
   '水': '#2980B9',
   '外购水': '#2980B9',
+  '氢气': '#00BCD4',
 }
 const DEFAULT_COLORS = ['#1ABC9C', '#8E44AD', '#34495E', '#16A085', '#C0392B', '#2980B9', '#F1C40F']
 
@@ -85,28 +95,39 @@ interface FlowEdge {
   standardQuantity: number
 }
 
-// Layout constants matching reference engineering diagram
+// Layout constants — horizontal positions are fixed; vertical spacing adapts to node count
 const MARGIN_LEFT = 30
-const CIRCLE_CX = MARGIN_LEFT + 80
-const CIRCLE_R = 34
-const DATA_COL1_X = CIRCLE_CX + CIRCLE_R + 16
-const DATA_COL2_X = DATA_COL1_X + 72
-const DIVIDER_1_X = DATA_COL2_X + 72
-const EQUIP_X = DIVIDER_1_X + 30
-const EQUIP_W = 66
-const EQUIP_H = 28
-const DIVIDER_2_X = EQUIP_X + EQUIP_W + 50
-const TERMINAL_X = DIVIDER_2_X + 20
-const TERMINAL_W = 66
-const TERMINAL_H = 34
-const RESULT_X = TERMINAL_X + TERMINAL_W + 30
-const RESULT_ARROW_X = RESULT_X + 80
-const TOTAL_WIDTH = RESULT_ARROW_X + 90
-
 const HEADER_Y = 20
 const SUB_HEADER_Y = 38
 const CONTENT_TOP = 58
-const ROW_HEIGHT = 90
+
+// Compute dynamic row height based on the maximum number of nodes in any layer
+function computeLayout(maxRows: number) {
+  // For small datasets keep spacious rows; shrink for large datasets
+  const rowH = maxRows <= 6 ? 90 : Math.max(46, Math.round(540 / maxRows))
+  const circleR = maxRows <= 6 ? 34 : Math.max(16, Math.min(34, Math.round((rowH - 8) / 2)))
+  const equipH = maxRows <= 6 ? 28 : Math.max(18, Math.round(rowH * 0.45))
+  const termH = maxRows <= 6 ? 34 : Math.max(20, Math.round(rowH * 0.55))
+  const fontSize = maxRows <= 10 ? 9 : Math.max(7, 9 - Math.floor((maxRows - 10) / 5))
+  const circleCX = MARGIN_LEFT + 80
+  const dataCol1X = circleCX + circleR + 16
+  const dataCol2X = dataCol1X + 72
+  const divider1X = dataCol2X + 72
+  const equipX = divider1X + 30
+  const equipW = 66
+  const divider2X = equipX + equipW + 50
+  const terminalX = divider2X + 20
+  const terminalW = 66
+  const resultX = terminalX + terminalW + 30
+  const resultArrowX = resultX + 80
+  const totalWidth = resultArrowX + 90
+  return {
+    rowH, circleR, equipH, termH, fontSize,
+    circleCX, dataCol1X, dataCol2X, divider1X,
+    equipX, equipW, divider2X, terminalX, terminalW,
+    resultX, resultArrowX, totalWidth,
+  }
+}
 
 function formatNum(n: number | undefined | null): string {
   if (n === undefined || n === null || n === 0) return ''
@@ -182,33 +203,34 @@ function buildGraph(flowData: EnergyFlowItem[], balanceData: EnergyBalanceItem[]
   }
 
   const maxRows = Math.max(layers.PURCHASE.length, layers.CONVERSION.length, layers.TERMINAL.length, 1)
-  const totalHeight = CONTENT_TOP + maxRows * ROW_HEIGHT + 30
+  const L = computeLayout(maxRows)
+  const totalHeight = CONTENT_TOP + maxRows * L.rowH + 30
 
   // Section headers
-  drawLine('top-line', MARGIN_LEFT, HEADER_Y - 6, TOTAL_WIDTH - 20, HEADER_Y - 6, '#999', 1, false)
+  drawLine('top-line', MARGIN_LEFT, HEADER_Y - 6, L.totalWidth - 20, HEADER_Y - 6, '#999', 1, false)
 
-  const sec1Mid = (MARGIN_LEFT + DIVIDER_1_X) / 2
-  const sec2Mid = (DIVIDER_1_X + DIVIDER_2_X) / 2
-  const sec3Mid = (DIVIDER_2_X + TOTAL_WIDTH - 20) / 2
+  const sec1Mid = (MARGIN_LEFT + L.divider1X) / 2
+  const sec2Mid = (L.divider1X + L.divider2X) / 2
+  const sec3Mid = (L.divider2X + L.totalWidth - 20) / 2
   addLabel('hdr-1', sec1Mid - 40, HEADER_Y - 4, '购入产出环节', 11, '#333', 'bold', 90)
   addLabel('hdr-2', sec2Mid - 35, HEADER_Y - 4, '加工转换环节', 11, '#333', 'bold', 80)
   addLabel('hdr-3', sec3Mid - 45, HEADER_Y - 4, '分配/最终消费环节', 11, '#333', 'bold', 110)
 
   drawLine('hdr-arrow-1', MARGIN_LEFT, HEADER_Y, MARGIN_LEFT + 16, HEADER_Y, '#666', 1, true)
-  drawLine('hdr-arrow-2', DIVIDER_1_X - 2, HEADER_Y, DIVIDER_1_X + 14, HEADER_Y, '#666', 1, true)
-  drawLine('hdr-arrow-3', DIVIDER_2_X - 2, HEADER_Y, DIVIDER_2_X + 14, HEADER_Y, '#666', 1, true)
+  drawLine('hdr-arrow-2', L.divider1X - 2, HEADER_Y, L.divider1X + 14, HEADER_Y, '#666', 1, true)
+  drawLine('hdr-arrow-3', L.divider2X - 2, HEADER_Y, L.divider2X + 14, HEADER_Y, '#666', 1, true)
 
-  addLabel('sub-equiv', DATA_COL1_X, SUB_HEADER_Y, '等价值', 9, '#666', 'normal', 50)
-  addLabel('sub-calor', DATA_COL2_X, SUB_HEADER_Y, '当量值', 9, '#666', 'normal', 50)
+  addLabel('sub-equiv', L.dataCol1X, SUB_HEADER_Y, '等价值', 9, '#666', 'normal', 50)
+  addLabel('sub-calor', L.dataCol2X, SUB_HEADER_Y, '当量值', 9, '#666', 'normal', 50)
 
-  drawLine('sep-line', MARGIN_LEFT, CONTENT_TOP - 4, TOTAL_WIDTH - 20, CONTENT_TOP - 4, '#CCC', 0.5, false)
+  drawLine('sep-line', MARGIN_LEFT, CONTENT_TOP - 4, L.totalWidth - 20, CONTENT_TOP - 4, '#CCC', 0.5, false)
 
-  drawLine('vdiv-1', DIVIDER_1_X, HEADER_Y - 6, DIVIDER_1_X, totalHeight, '#AAA', 1, false)
-  drawLine('vdiv-2', DIVIDER_2_X, HEADER_Y - 6, DIVIDER_2_X, totalHeight, '#AAA', 1, false)
+  drawLine('vdiv-1', L.divider1X, HEADER_Y - 6, L.divider1X, totalHeight, '#AAA', 1, false)
+  drawLine('vdiv-2', L.divider2X, HEADER_Y - 6, L.divider2X, totalHeight, '#AAA', 1, false)
 
   // PURCHASE nodes: circles + data columns
   layers.PURCHASE.forEach((node, idx) => {
-    const cy = CONTENT_TOP + idx * ROW_HEIGHT + ROW_HEIGHT / 2
+    const cy = CONTENT_TOP + idx * L.rowH + L.rowH / 2
     const color = node.energyProducts.length > 0 ? getEnergyColor(node.energyProducts[0]) : '#409EFF'
     const balance = node.balanceInfo
     const unit = balance ? (balance.measurement_unit ?? balance.measurementUnit ?? '') : ''
@@ -218,26 +240,26 @@ function buildGraph(flowData: EnergyFlowItem[], balanceData: EnergyBalanceItem[]
 
     graph!.addNode({
       id: node.id,
-      x: CIRCLE_CX - CIRCLE_R,
-      y: cy - CIRCLE_R,
-      width: CIRCLE_R * 2,
-      height: CIRCLE_R * 2,
+      x: L.circleCX - L.circleR,
+      y: cy - L.circleR,
+      width: L.circleR * 2,
+      height: L.circleR * 2,
       shape: 'ellipse',
       attrs: {
         body: { fill: '#FFFFFF', stroke: color, strokeWidth: 2 },
         label: {
-          text: node.label + '\n' + (purchaseAmt ? formatNum(purchaseAmt) + unit : ''),
+          text: purchaseAmt ? (node.label + '\n' + formatNum(purchaseAmt) + unit) : node.label,
           fill: color,
-          fontSize: 9,
+          fontSize: L.fontSize,
           fontWeight: 'bold',
-          lineHeight: 13,
+          lineHeight: L.fontSize + 4,
         },
       },
       ports: {
         items: [{ id: node.id + '-out', group: 'right' }],
         groups: {
           right: {
-            position: { name: 'absolute', args: { x: CIRCLE_R * 2, y: CIRCLE_R } },
+            position: { name: 'absolute', args: { x: L.circleR * 2, y: L.circleR } },
             attrs: { circle: { r: 0 } },
           },
         },
@@ -247,41 +269,41 @@ function buildGraph(flowData: EnergyFlowItem[], balanceData: EnergyBalanceItem[]
     const purchaseStr = formatNum(purchaseAmt)
     const purchaseStdStr = stdAmt ? '(' + formatNum(stdAmt) + ')' : ''
     if (purchaseStr) {
-      addLabel('d1v-' + node.id, DATA_COL1_X, cy - 8, purchaseStr, 9, '#333', 'normal', 60)
+      addLabel('d1v-' + node.id, L.dataCol1X, cy - 8, purchaseStr, L.fontSize, '#333', 'normal', 60)
       if (purchaseStdStr) {
-        addLabel('d1s-' + node.id, DATA_COL1_X, cy + 5, purchaseStdStr, 8, '#888', 'normal', 60)
+        addLabel('d1s-' + node.id, L.dataCol1X, cy + 5, purchaseStdStr, L.fontSize - 1, '#888', 'normal', 60)
       }
     }
 
     const consumeStr = formatNum(consumeAmt || purchaseAmt)
     const consumeStdStr = stdAmt ? '(' + formatNum(stdAmt) + ')' : ''
     if (consumeStr) {
-      addLabel('d2v-' + node.id, DATA_COL2_X, cy - 8, consumeStr, 9, '#333', 'normal', 60)
+      addLabel('d2v-' + node.id, L.dataCol2X, cy - 8, consumeStr, L.fontSize, '#333', 'normal', 60)
       if (consumeStdStr) {
-        addLabel('d2s-' + node.id, DATA_COL2_X, cy + 5, consumeStdStr, 8, '#888', 'normal', 60)
+        addLabel('d2s-' + node.id, L.dataCol2X, cy + 5, consumeStdStr, L.fontSize - 1, '#888', 'normal', 60)
       }
     }
 
-    drawLine('hconn-' + node.id, CIRCLE_CX + CIRCLE_R, cy, DATA_COL1_X - 4, cy, color, 1, false)
+    drawLine('hconn-' + node.id, L.circleCX + L.circleR, cy, L.dataCol1X - 4, cy, color, 1, false)
   })
 
   // CONVERSION nodes: equipment boxes
   const convOffsetY = layers.CONVERSION.length < layers.PURCHASE.length
-    ? ((layers.PURCHASE.length - layers.CONVERSION.length) * ROW_HEIGHT) / 2
+    ? ((layers.PURCHASE.length - layers.CONVERSION.length) * L.rowH) / 2
     : 0
   layers.CONVERSION.forEach((node, idx) => {
-    const cy = CONTENT_TOP + idx * ROW_HEIGHT + ROW_HEIGHT / 2 + convOffsetY
+    const cy = CONTENT_TOP + idx * L.rowH + L.rowH / 2 + convOffsetY
 
     graph!.addNode({
       id: node.id,
-      x: EQUIP_X,
-      y: cy - EQUIP_H / 2,
-      width: EQUIP_W,
-      height: EQUIP_H,
+      x: L.equipX,
+      y: cy - L.equipH / 2,
+      width: L.equipW,
+      height: L.equipH,
       shape: 'rect',
       attrs: {
         body: { fill: '#FFFFFF', stroke: '#333', strokeWidth: 1.5 },
-        label: { text: node.label, fill: '#333', fontSize: 9, fontWeight: 'bold' },
+        label: { text: node.label, fill: '#333', fontSize: L.fontSize, fontWeight: 'bold' },
       },
       ports: {
         items: [
@@ -298,21 +320,21 @@ function buildGraph(flowData: EnergyFlowItem[], balanceData: EnergyBalanceItem[]
 
   // TERMINAL nodes: consumption boxes + right arrows
   const termOffsetY = layers.TERMINAL.length < layers.PURCHASE.length
-    ? ((layers.PURCHASE.length - layers.TERMINAL.length) * ROW_HEIGHT) / 2
+    ? ((layers.PURCHASE.length - layers.TERMINAL.length) * L.rowH) / 2
     : 0
   layers.TERMINAL.forEach((node, idx) => {
-    const cy = CONTENT_TOP + idx * ROW_HEIGHT + ROW_HEIGHT / 2 + termOffsetY
+    const cy = CONTENT_TOP + idx * L.rowH + L.rowH / 2 + termOffsetY
 
     graph!.addNode({
       id: node.id,
-      x: TERMINAL_X,
-      y: cy - TERMINAL_H / 2,
-      width: TERMINAL_W,
-      height: TERMINAL_H,
+      x: L.terminalX,
+      y: cy - L.termH / 2,
+      width: L.terminalW,
+      height: L.termH,
       shape: 'rect',
       attrs: {
         body: { fill: '#FFFFFF', stroke: '#333', strokeWidth: 1.5 },
-        label: { text: node.label, fill: '#333', fontSize: 9, fontWeight: 'bold' },
+        label: { text: node.label, fill: '#333', fontSize: L.fontSize, fontWeight: 'bold' },
       },
       ports: {
         items: [
@@ -328,10 +350,10 @@ function buildGraph(flowData: EnergyFlowItem[], balanceData: EnergyBalanceItem[]
     const totalTce = terminalEdges.reduce((sum, e) => sum + (e.standardQuantity || 0), 0)
 
     if (totalTce > 0) {
-      drawLine('tarrow-' + node.id, TERMINAL_X + TERMINAL_W + 2, cy, RESULT_X - 4, cy, '#333', 1, true)
-      addLabel('res-name-' + node.id, RESULT_X, cy - 10, node.label, 9, '#333', 'bold', 70)
-      addLabel('res-tce-' + node.id, RESULT_X, cy + 3, formatNum(totalTce) + 'tce', 8, '#666', 'normal', 70)
-      drawLine('farrow-' + node.id, RESULT_X + 64, cy, RESULT_ARROW_X, cy, '#333', 1, true)
+      drawLine('tarrow-' + node.id, L.terminalX + L.terminalW + 2, cy, L.resultX - 4, cy, '#333', 1, true)
+      addLabel('res-name-' + node.id, L.resultX, cy - 10, node.label, L.fontSize, '#333', 'bold', 70)
+      addLabel('res-tce-' + node.id, L.resultX, cy + 3, formatNum(totalTce) + 'tce', L.fontSize - 1, '#666', 'normal', 70)
+      drawLine('farrow-' + node.id, L.resultX + 64, cy, L.resultArrowX, cy, '#333', 1, true)
     }
   })
 
@@ -356,8 +378,8 @@ function buildGraph(flowData: EnergyFlowItem[], balanceData: EnergyBalanceItem[]
       const tOffY = targetNode.layer === 'TERMINAL' ? termOffsetY
         : targetNode.layer === 'CONVERSION' ? convOffsetY : 0
 
-      const sourceCy = CONTENT_TOP + sourceLayerIdx * ROW_HEIGHT + ROW_HEIGHT / 2 + sOffY
-      const targetCy = CONTENT_TOP + targetLayerIdx * ROW_HEIGHT + ROW_HEIGHT / 2 + tOffY
+      const sourceCy = CONTENT_TOP + sourceLayerIdx * L.rowH + L.rowH / 2 + sOffY
+      const targetCy = CONTENT_TOP + targetLayerIdx * L.rowH + L.rowH / 2 + tOffY
 
       const physStr = edge.physicalQuantity ? formatNum(edge.physicalQuantity) : ''
       const stdStr = edge.standardQuantity ? '(' + formatNum(edge.standardQuantity) + 'tce)' : ''
@@ -382,7 +404,7 @@ function buildGraph(flowData: EnergyFlowItem[], balanceData: EnergyBalanceItem[]
         labels: labelText
           ? [{
               attrs: {
-                label: { text: labelText, fill: color, fontSize: 8, fontWeight: 'bold' },
+                label: { text: labelText, fill: color, fontSize: Math.max(6, L.fontSize - 1), fontWeight: 'bold' },
                 rect: { fill: '#fff', stroke: 'none', rx: 2, ry: 2, opacity: 0.9 },
               },
               position: { distance: 0.45, offset: { x: 0, y: -10 + parallelOffset } },
