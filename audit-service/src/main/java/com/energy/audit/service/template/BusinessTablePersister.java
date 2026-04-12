@@ -201,7 +201,13 @@ public class BusinessTablePersister {
         row.put("deleted", 0);
         fillRequiredYearColumns(tableName, row, auditYear);
 
-        insertOrMergeRow(tableName, submissionId, enterpriseId, auditYear, row);
+        try {
+            insertOrMergeRow(tableName, submissionId, enterpriseId, auditYear, row);
+        } catch (Exception e) {
+            log.warn("persistScalar failed for table '{}' column '{}' — falling back to generic storage: {}",
+                    tableName, columnName, e.getMessage());
+            return false;
+        }
         return true;
     }
 
@@ -275,8 +281,13 @@ public class BusinessTablePersister {
                 })
                 .toArray(MapSqlParameterSource[]::new);
 
-        jdbcTemplate.batchUpdate(sql.toString(), batchParams);
-        log.info("Inserted {} rows into {} for submission {}", dbRows.size(), tableName, submissionId);
+        try {
+            jdbcTemplate.batchUpdate(sql.toString(), batchParams);
+            log.info("Inserted {} rows into {} for submission {}", dbRows.size(), tableName, submissionId);
+        } catch (Exception e) {
+            log.warn("persistTableRows failed for table '{}' ({} rows) — data saved to generic storage: {}",
+                    tableName, dbRows.size(), e.getMessage());
+        }
     }
 
     private void insertOrMergeRow(String tableName, Long submissionId, Long enterpriseId,
