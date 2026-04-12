@@ -57,28 +57,53 @@ public class BusinessTablePersister {
     /** Tables confirmed to have the submission_id column in the live DB. */
     private Set<String> tablesWithSubmissionId = Collections.emptySet();
 
+    /** Known columns per table — probed at startup to skip unknown columns gracefully. */
+    private Map<String, Set<String>> knownColumnsByTable = Collections.emptyMap();
+
     public BusinessTablePersister(NamedParameterJdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
 
     @PostConstruct
-    void probeSubmissionIdColumns() {
-        Set<String> confirmed = new HashSet<>();
+    void probeTableMetadata() {
+        Set<String> confirmedSid = new HashSet<>();
+        Map<String, Set<String>> columnMap = new HashMap<>();
+
         for (String table : ALLOWED_TABLES) {
             try {
-                jdbcTemplate.queryForList(
-                        "SELECT submission_id FROM " + table + " WHERE 1=0",
+                List<Map<String, Object>> cols = jdbcTemplate.queryForList(
+                        "SELECT * FROM " + table + " WHERE 1=0",
                         new MapSqlParameterSource());
-                confirmed.add(table);
+                // cols is empty list but the metadata is available from column names
+                Set<String> colNames = new HashSet<>();
+                try {
+                    // Use INFORMATION_SCHEMA for reliable column discovery
+                    List<Map<String, Object>> infoRows = jdbcTemplate.queryForList(
+                            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = :table",
+                            new MapSqlParameterSource("table", table));
+                    for (Map<String, Object> row : infoRows) {
+                        Object cn = row.get("COLUMN_NAME");
+                        if (cn != null) colNames.add(cn.toString().toLowerCase());
+                    }
+                } catch (Exception e) {
+                    log.debug("INFORMATION_SCHEMA probe failed for '{}', skipping column filter", table);
+                }
+                if (!colNames.isEmpty()) {
+                    columnMap.put(table, colNames);
+                }
+                if (colNames.contains("submission_id")) {
+                    confirmedSid.add(table);
+                }
             } catch (Exception e) {
-                log.warn("Table '{}' is missing 'submission_id' column — "
-                        + "run sql/04-fix-add-submission-id.sql to fix. "
-                        + "Falling back to enterprise_id+audit_year keying.", table);
+                log.warn("Table '{}' does not exist or is inaccessible — skipping", table);
             }
         }
-        this.tablesWithSubmissionId = Collections.unmodifiableSet(confirmed);
-        log.info("BusinessTablePersister: {}/{} tables have submission_id",
-                confirmed.size(), ALLOWED_TABLES.size());
+
+        this.tablesWithSubmissionId = Collections.unmodifiableSet(confirmedSid);
+        this.knownColumnsByTable = Collections.unmodifiableMap(columnMap);
+        log.info("BusinessTablePersister: {}/{} tables probed, {}/{} have submission_id",
+                columnMap.size(), ALLOWED_TABLES.size(),
+                confirmedSid.size(), ALLOWED_TABLES.size());
     }
 
     private boolean hasSubmissionId(String tableName) {
@@ -87,6 +112,16 @@ public class BusinessTablePersister {
 
     public boolean isBusinessTable(String tableName) {
         return tableName != null && ALLOWED_TABLES.contains(tableName.toLowerCase());
+    }
+
+    /**
+     * Check if a column exists in the given table.
+     * Returns true if column metadata is unknown (not probed) to avoid false negatives.
+     */
+    private boolean isKnownColumn(String tableName, String columnName) {
+        Set<String> cols = knownColumnsByTable.get(tableName.toLowerCase());
+        if (cols == null) return true; // no metadata — assume column exists
+        return cols.contains(columnName.toLowerCase());
     }
 
     public void deleteBySubmissionId(String tableName, Long submissionId, String operator) {
@@ -136,14 +171,23 @@ public class BusinessTablePersister {
         log.debug("Soft-deleted {} rows from {} for enterprise {} year {}", deleted, tableName, enterpriseId, auditYear);
     }
 
-    public void persistScalar(String tableName, Long submissionId, Long enterpriseId,
+    /**
+     * Returns false if the column doesn't exist in the table and the caller
+     * should fall back to generic storage.
+     */
+    public boolean persistScalar(String tableName, Long submissionId, Long enterpriseId,
                                Integer auditYear, String fieldName, Object value, String operator) {
-        if (!isBusinessTable(tableName)) return;
+        if (!isBusinessTable(tableName)) return false;
 
         String columnName = camelToSnake(fieldName);
         if (!SAFE_COLUMN_PATTERN.matcher(columnName).matches()) {
             log.warn("Skipping unsafe column name '{}' for scalar persist to '{}'", columnName, tableName);
-            return;
+            return false;
+        }
+        if (!isKnownColumn(tableName, columnName)) {
+            log.warn("Column '{}' does not exist in table '{}' — falling back to generic storage",
+                    columnName, tableName);
+            return false;
         }
         Map<String, Object> row = new HashMap<>();
         if (hasSubmissionId(tableName)) {
@@ -158,6 +202,7 @@ public class BusinessTablePersister {
         fillRequiredYearColumns(tableName, row, auditYear);
 
         insertOrMergeRow(tableName, submissionId, enterpriseId, auditYear, row);
+        return true;
     }
 
     public void persistTableRows(String tableName, Long submissionId, Long enterpriseId,
@@ -184,6 +229,10 @@ public class BusinessTablePersister {
                 if (!SYSTEM_COLUMNS.contains(colName)) {
                     if (!SAFE_COLUMN_PATTERN.matcher(colName).matches()) {
                         log.warn("Skipping unsafe column name '{}' for table '{}'", colName, tableName);
+                        continue;
+                    }
+                    if (!isKnownColumn(tableName, colName)) {
+                        log.debug("Skipping unknown column '{}' for table '{}'", colName, tableName);
                         continue;
                     }
                     dbRow.put(colName, convertValue(entry.getValue()));
