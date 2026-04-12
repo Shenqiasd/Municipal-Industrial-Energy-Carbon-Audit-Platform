@@ -797,13 +797,15 @@ CREATE TABLE `de_equipment_test` (
 DROP TABLE IF EXISTS `de_obsolete_equipment`;
 CREATE TABLE `de_obsolete_equipment` (
     `id`                 BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `submission_id`      BIGINT       NOT NULL DEFAULT 0     COMMENT '关联提交ID',
     `enterprise_id`      BIGINT       NOT NULL                COMMENT '企业ID -> ent_enterprise.id',
     `audit_year`         INT          NOT NULL                COMMENT '审计年度',
-    `device_name`        VARCHAR(128) DEFAULT NULL            COMMENT '淘汰设备名称',
+    `seq_no`             INT          DEFAULT NULL            COMMENT '序号',
+    `equipment_name`     VARCHAR(128) DEFAULT NULL            COMMENT '淘汰设备名称',
     `model_spec`         VARCHAR(128) DEFAULT NULL            COMMENT '型号规格',
     `quantity`           INT          DEFAULT NULL            COMMENT '数量',
-    `start_use_date`     DATE         DEFAULT NULL            COMMENT '开始使用日期',
-    `plan_complete_date` DATE         DEFAULT NULL            COMMENT '计划完成日期',
+    `start_use_date`     VARCHAR(32)  DEFAULT NULL            COMMENT '开始使用日期',
+    `planned_retire_date` VARCHAR(32) DEFAULT NULL            COMMENT '计划完成日期',
     `remark`             VARCHAR(512) DEFAULT NULL            COMMENT '备注',
     `create_by`          VARCHAR(64)  DEFAULT NULL            COMMENT '创建人',
     `create_time`        DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -811,6 +813,7 @@ CREATE TABLE `de_obsolete_equipment` (
     `update_time`        DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `deleted`            TINYINT      DEFAULT 0               COMMENT '逻辑删除(0未删除 1已删除)',
     PRIMARY KEY (`id`),
+    INDEX `idx_submission` (`submission_id`),
     INDEX `idx_enterprise_year` (`enterprise_id`, `audit_year`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='淘汰产品设备装置目录';
 
@@ -955,24 +958,31 @@ CREATE TABLE `de_product_energy_cost` (
 
 -- ----------------------------
 -- 5.17 节能量计算 (4.14)
+-- 生产表名: de_saving_calculation (与 03-wave6-schema-expansion.sql 一致)
 -- ----------------------------
-DROP TABLE IF EXISTS `de_energy_saving_calc`;
-CREATE TABLE `de_energy_saving_calc` (
-    `id`             BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-    `enterprise_id`  BIGINT        NOT NULL                COMMENT '企业ID -> ent_enterprise.id',
-    `audit_year`     INT           NOT NULL                COMMENT '审计年度',
-    `year_type`      VARCHAR(16)   NOT NULL                COMMENT '年份(字典: 2024/审计年)',
-    `energy_equiv`   DECIMAL(18,4) DEFAULT NULL            COMMENT '综合能耗等价值(吨标煤)',
-    `energy_equil`   DECIMAL(18,4) DEFAULT NULL            COMMENT '综合能耗当量值(吨标煤)',
-    `gross_output`   DECIMAL(18,4) DEFAULT NULL            COMMENT '工业总产值(万元)',
-    `product_output` DECIMAL(18,4) DEFAULT NULL            COMMENT '产品产量',
-    `product_unit`   VARCHAR(32)   DEFAULT NULL            COMMENT '产品单位',
-    `create_by`      VARCHAR(64)   DEFAULT NULL            COMMENT '创建人',
-    `create_time`    DATETIME      DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_by`      VARCHAR(64)   DEFAULT NULL            COMMENT '更新人',
-    `update_time`    DATETIME      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`        TINYINT       DEFAULT 0               COMMENT '逻辑删除(0未删除 1已删除)',
+DROP TABLE IF EXISTS `de_saving_calculation`;
+CREATE TABLE `de_saving_calculation` (
+    `id`                     BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `submission_id`          BIGINT        NOT NULL DEFAULT 0     COMMENT '关联提交ID',
+    `enterprise_id`          BIGINT        NOT NULL                COMMENT '企业ID -> ent_enterprise.id',
+    `audit_year`             INT           NOT NULL                COMMENT '审计年度',
+    `energy_equal_current`   DECIMAL(18,4) DEFAULT NULL            COMMENT '当年综合能耗等价值(吨标煤)',
+    `energy_equiv_current`   DECIMAL(18,4) DEFAULT NULL            COMMENT '当年综合能耗当量值(吨标煤)',
+    `gross_output_current`   DECIMAL(18,4) DEFAULT NULL            COMMENT '当年工业总产值(万元)',
+    `product_output_current` DECIMAL(18,4) DEFAULT NULL            COMMENT '当年产品产量',
+    `product_unit_current`   VARCHAR(32)   DEFAULT NULL            COMMENT '当年产品单位',
+    `energy_equal_base`      DECIMAL(18,4) DEFAULT NULL            COMMENT '基期综合能耗等价值(吨标煤)',
+    `energy_equiv_base`      DECIMAL(18,4) DEFAULT NULL            COMMENT '基期综合能耗当量值(吨标煤)',
+    `gross_output_base`      DECIMAL(18,4) DEFAULT NULL            COMMENT '基期工业总产值(万元)',
+    `product_output_base`    DECIMAL(18,4) DEFAULT NULL            COMMENT '基期产品产量',
+    `product_unit_base`      VARCHAR(32)   DEFAULT NULL            COMMENT '基期产品单位',
+    `create_by`              VARCHAR(64)   DEFAULT NULL            COMMENT '创建人',
+    `create_time`            DATETIME      DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_by`              VARCHAR(64)   DEFAULT NULL            COMMENT '更新人',
+    `update_time`            DATETIME      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `deleted`                TINYINT       DEFAULT 0               COMMENT '逻辑删除(0未删除 1已删除)',
     PRIMARY KEY (`id`),
+    INDEX `idx_submission` (`submission_id`),
     INDEX `idx_enterprise_year` (`enterprise_id`, `audit_year`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='节能量计算';
 
@@ -1029,33 +1039,40 @@ CREATE TABLE `de_saving_potential` (
 -- ----------------------------
 DROP TABLE IF EXISTS `de_management_policy`;
 CREATE TABLE `de_management_policy` (
-    `id`            BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-    `enterprise_id` BIGINT       NOT NULL                COMMENT '企业ID -> ent_enterprise.id',
-    `audit_year`    INT          NOT NULL                COMMENT '审计年度',
-    `policy_name`   VARCHAR(256) DEFAULT NULL            COMMENT '制度名称',
-    `department`    VARCHAR(128) DEFAULT NULL            COMMENT '主管部门',
-    `publish_date`  DATE         DEFAULT NULL            COMMENT '颁布日期',
-    `valid_period`  VARCHAR(64)  DEFAULT NULL            COMMENT '有效期',
-    `main_content`  TEXT         DEFAULT NULL            COMMENT '主要内容',
-    `remark`        VARCHAR(512) DEFAULT NULL            COMMENT '备注',
-    `create_by`     VARCHAR(64)  DEFAULT NULL            COMMENT '创建人',
-    `create_time`   DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_by`     VARCHAR(64)  DEFAULT NULL            COMMENT '更新人',
-    `update_time`   DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`       TINYINT      DEFAULT 0               COMMENT '逻辑删除(0未删除 1已删除)',
+    `id`             BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `submission_id`  BIGINT       NOT NULL DEFAULT 0     COMMENT '关联提交ID',
+    `enterprise_id`  BIGINT       NOT NULL                COMMENT '企业ID -> ent_enterprise.id',
+    `audit_year`     INT          NOT NULL                COMMENT '审计年度',
+    `seq_no`         INT          DEFAULT NULL            COMMENT '序号',
+    `policy_name`    VARCHAR(256) DEFAULT NULL            COMMENT '制度名称',
+    `main_content`   TEXT         DEFAULT NULL            COMMENT '主要内容',
+    `supervise_dept` VARCHAR(128) DEFAULT NULL            COMMENT '主管部门',
+    `publish_date`   VARCHAR(32)  DEFAULT NULL            COMMENT '颁布日期',
+    `valid_period`   VARCHAR(64)  DEFAULT NULL            COMMENT '有效期',
+    `remark`         VARCHAR(512) DEFAULT NULL            COMMENT '备注',
+    `create_by`      VARCHAR(64)  DEFAULT NULL            COMMENT '创建人',
+    `create_time`    DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_by`      VARCHAR(64)  DEFAULT NULL            COMMENT '更新人',
+    `update_time`    DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `deleted`        TINYINT      DEFAULT 0               COMMENT '逻辑删除(0未删除 1已删除)',
     PRIMARY KEY (`id`),
+    INDEX `idx_submission` (`submission_id`),
     INDEX `idx_enterprise_year` (`enterprise_id`, `audit_year`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='能源管理制度';
 
 -- ----------------------------
 -- 5.21 能源管理改进建议 (4.19)
+-- 生产表名: de_management_suggestion (与 03-wave6-schema-expansion.sql 一致)
 -- ----------------------------
-DROP TABLE IF EXISTS `de_improvement_suggestion`;
-CREATE TABLE `de_improvement_suggestion` (
+DROP TABLE IF EXISTS `de_management_suggestion`;
+CREATE TABLE `de_management_suggestion` (
     `id`            BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `submission_id` BIGINT        NOT NULL DEFAULT 0     COMMENT '关联提交ID',
     `enterprise_id` BIGINT        NOT NULL                COMMENT '企业ID -> ent_enterprise.id',
     `audit_year`    INT           NOT NULL                COMMENT '审计年度',
+    `seq_no`        INT           DEFAULT NULL            COMMENT '序号',
     `project_name`  VARCHAR(256)  DEFAULT NULL            COMMENT '项目名称',
+    `main_content`  TEXT          DEFAULT NULL            COMMENT '主要内容',
     `investment`    DECIMAL(18,4) DEFAULT NULL            COMMENT '投资(万元)',
     `annual_saving` DECIMAL(18,4) DEFAULT NULL            COMMENT '年节能量(吨标煤)',
     `remark`        VARCHAR(512)  DEFAULT NULL            COMMENT '备注',
@@ -1065,18 +1082,23 @@ CREATE TABLE `de_improvement_suggestion` (
     `update_time`   DATETIME      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `deleted`       TINYINT       DEFAULT 0               COMMENT '逻辑删除(0未删除 1已删除)',
     PRIMARY KEY (`id`),
+    INDEX `idx_submission` (`submission_id`),
     INDEX `idx_enterprise_year` (`enterprise_id`, `audit_year`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='能源管理改进建议';
 
 -- ----------------------------
 -- 5.22 节能技术改造建议汇总 (4.20)
+-- 生产表名: de_tech_reform_suggestion (与 03-wave6-schema-expansion.sql 一致)
 -- ----------------------------
-DROP TABLE IF EXISTS `de_tech_reform`;
-CREATE TABLE `de_tech_reform` (
+DROP TABLE IF EXISTS `de_tech_reform_suggestion`;
+CREATE TABLE `de_tech_reform_suggestion` (
     `id`              BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `submission_id`   BIGINT        NOT NULL DEFAULT 0     COMMENT '关联提交ID',
     `enterprise_id`   BIGINT        NOT NULL                COMMENT '企业ID -> ent_enterprise.id',
     `audit_year`      INT           NOT NULL                COMMENT '审计年度',
+    `seq_no`          INT           DEFAULT NULL            COMMENT '序号',
     `project_name`    VARCHAR(256)  DEFAULT NULL            COMMENT '项目名称',
+    `main_content`    TEXT          DEFAULT NULL            COMMENT '主要内容',
     `investment`      DECIMAL(18,4) DEFAULT NULL            COMMENT '投资(万元)',
     `annual_saving`   DECIMAL(18,4) DEFAULT NULL            COMMENT '年节能量(吨标煤)',
     `payback_period`  DECIMAL(8,2)  DEFAULT NULL            COMMENT '投资回收期(年)',
@@ -1087,6 +1109,7 @@ CREATE TABLE `de_tech_reform` (
     `update_time`     DATETIME      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `deleted`         TINYINT       DEFAULT 0               COMMENT '逻辑删除(0未删除 1已删除)',
     PRIMARY KEY (`id`),
+    INDEX `idx_submission` (`submission_id`),
     INDEX `idx_enterprise_year` (`enterprise_id`, `audit_year`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='节能技术改造建议汇总';
 

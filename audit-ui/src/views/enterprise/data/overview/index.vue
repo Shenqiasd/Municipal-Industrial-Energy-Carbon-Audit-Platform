@@ -216,8 +216,9 @@ const COL_LABELS: Record<string, string> = {
   consumption_amount: '消费量',
   transfer_out_amount: '转出量',
   // de_obsolete_equipment (淘汰产品设备装置目录)
+  equipment_name: '淘汰设备名称',
   start_use_date: '开始使用日期',
-  plan_complete_date: '计划完成日期',
+  planned_retire_date: '计划完成日期',
   source_unit: '来源单元',
   target_unit: '目标单元',
   energy_product: '能源产品',
