@@ -128,11 +128,13 @@ public class DataPersistenceServiceImpl implements DataPersistenceService {
                     }
                 }
             } else {
+                boolean persisted = false;
                 if (hasBusinessTable) {
-                    businessTablePersister.persistScalar(
+                    persisted = businessTablePersister.persistScalar(
                             targetTable, submissionId, enterpriseId, auditYear,
                             fieldName, value, operator);
-                } else {
+                }
+                if (!persisted) {
                     DeSubmissionField field = new DeSubmissionField();
                     field.setSubmissionId(submissionId);
                     field.setEnterpriseId(enterpriseId);
