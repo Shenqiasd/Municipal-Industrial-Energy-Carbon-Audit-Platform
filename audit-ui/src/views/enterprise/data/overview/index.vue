@@ -291,11 +291,7 @@ const COL_LABELS: Record<string, string> = {
   start_time: '起始时间',
   end_time: '结束时间',
   period_consumption: '期间消耗',
-  // de_carbon_emission (碳排放)
-  emission_category: '排放分类',
-  source_name: '排放源名称',
-  emission_factor: '排放因子',
-  co2_emission: 'CO₂排放量(tCO2)',
+  // de_carbon_emission (碳排放) — emission_category/source_name/co2_emission 已在上方定义
   low_heat_value: '低位发热量',
   carbon_content: '含碳量',
   oxidation_rate: '碳氧化率',
@@ -377,7 +373,7 @@ const NUMERIC_COLS = new Set([
   'saving_potential', 'period_consumption',
   'target_indicator', 'actual_indicator', 'annual_target',
   'low_heat_value', 'carbon_content', 'oxidation_rate',
-  'peak_year', 'peak_emission', 'current_emission', 'reduction_target',
+  'peak_emission', 'current_emission', 'reduction_target',
   'energy_id', 'product_id', 'output', 'energy_consumption',
   'unit_count',
 ])
