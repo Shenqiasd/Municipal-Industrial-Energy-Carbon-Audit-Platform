@@ -211,9 +211,9 @@ public class BusinessTablePersister {
         return true;
     }
 
-    public void persistTableRows(String tableName, Long submissionId, Long enterpriseId,
+    public boolean persistTableRows(String tableName, Long submissionId, Long enterpriseId,
                                   Integer auditYear, List<Map<String, Object>> rows, String operator) {
-        if (!isBusinessTable(tableName)) return;
+        if (!isBusinessTable(tableName)) return false;
 
         boolean hasSid = hasSubmissionId(tableName);
         List<Map<String, Object>> dbRows = new ArrayList<>();
@@ -250,7 +250,7 @@ public class BusinessTablePersister {
             dbRows.add(dbRow);
         }
 
-        if (dbRows.isEmpty()) return;
+        if (dbRows.isEmpty()) return true;
 
         // Collect the UNION of all column keys across all rows so that
         // heterogeneous rows (e.g. different device types in EQUIPMENT_BENCHMARK)
@@ -284,9 +284,11 @@ public class BusinessTablePersister {
         try {
             jdbcTemplate.batchUpdate(sql.toString(), batchParams);
             log.info("Inserted {} rows into {} for submission {}", dbRows.size(), tableName, submissionId);
+            return true;
         } catch (Exception e) {
-            log.warn("persistTableRows failed for table '{}' ({} rows) — data saved to generic storage: {}",
+            log.warn("persistTableRows failed for table '{}' ({} rows) — falling back to generic storage: {}",
                     tableName, dbRows.size(), e.getMessage());
+            return false;
         }
     }
 
