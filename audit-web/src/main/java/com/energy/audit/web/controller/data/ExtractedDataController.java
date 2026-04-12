@@ -176,6 +176,17 @@ public class ExtractedDataController {
                 && !TABLE_LABELS.containsKey(tableName)) {
             throw new BusinessException(400, "不允许查询的表: " + tableName);
         }
+
+        // For optional tables that may not exist yet, return empty page instead of SQL error
+        if (OPTIONAL_TABLES.contains(tableName)) {
+            try {
+                jdbcTemplate.queryForList("SELECT 1 FROM " + tableName + " WHERE 1=0",
+                        new MapSqlParameterSource());
+            } catch (Exception e) {
+                return R.ok(PageResult.of(0L, List.of()));
+            }
+        }
+
         if (pageNum < 1) pageNum = 1;
         if (pageSize < 1) pageSize = 1;
         if (pageSize > 100) pageSize = 100;
