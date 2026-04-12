@@ -374,7 +374,7 @@ const NUMERIC_COLS = new Set([
   'target_indicator', 'actual_indicator', 'annual_target',
   'low_heat_value', 'carbon_content', 'oxidation_rate',
   'peak_emission', 'current_emission', 'reduction_target',
-  'energy_id', 'product_id', 'output', 'energy_consumption',
+  'output', 'energy_consumption',
   'unit_count',
 ])
 
