@@ -302,11 +302,11 @@ export const SCHEMA_REGISTRY: Record<string, TableSchema> = {
   de_obsolete_equipment: {
     label: '淘汰产品设备装置目录',
     fields: {
-      device_name:        { label: '淘汰设备名称', type: 'STRING' },
+      equipment_name:      { label: '淘汰设备名称', type: 'STRING' },
       model_spec:         { label: '型号规格', type: 'STRING' },
       quantity:           { label: '数量', type: 'NUMBER' },
       start_use_date:     { label: '开始使用日期', type: 'DATE' },
-      plan_complete_date: { label: '计划完成日期', type: 'DATE' },
+      planned_retire_date: { label: '计划完成日期', type: 'DATE' },
       remark:             { label: '备注', type: 'STRING' },
     },
   },
@@ -396,7 +396,7 @@ export const SCHEMA_REGISTRY: Record<string, TableSchema> = {
     label: '能源管理制度',
     fields: {
       policy_name:  { label: '制度名称', type: 'STRING' },
-      department:   { label: '主管部门', type: 'STRING' },
+      supervise_dept: { label: '主管部门', type: 'STRING' },
       publish_date: { label: '颁布日期', type: 'DATE' },
       valid_period: { label: '有效期', type: 'STRING' },
       main_content: { label: '主要内容', type: 'TEXT' },
