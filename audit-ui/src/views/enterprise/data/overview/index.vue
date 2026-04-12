@@ -277,6 +277,10 @@ const NUMERIC_COLS = new Set([
   'gain_loss', 'energy_unit_price',
   'energy_control_total', 'product_unit_consumption', 'saving_amount',
   'energy_equiv', 'energy_equal', 'unit_energy_equiv', 'unit_energy_equal',
+  // P1 新增 DECIMAL 列
+  'cost_ratio', 'energy_total_ratio', 'energy_cost',
+  'consumption_amount', 'transfer_out_amount',
+  'carbon_reduction', 'annual_capacity', 'annual_output', 'unit_consumption',
 ])
 
 function isNumericCol(col: string): boolean {
