@@ -24,6 +24,11 @@ export interface GCDataValidator {
   showInputMessage(value: boolean): void
   inputTitle(title: string): void
   inputMessage(msg: string): void
+  showErrorMessage(value: boolean): void
+  errorTitle(title: string): void
+  errorMessage(msg: string): void
+  errorStyle(style: number): void
+  errorStyle(): number
 }
 
 export interface GCDataValidation {
@@ -86,6 +91,7 @@ export interface GCSpreadSheet {
   name(): string
   getDefaultStyle(): GCDefaultStyle | null
   setDefaultStyle(style: GCDefaultStyle): void
+  bind(eventType: string, handler: (...args: unknown[]) => void): void
 }
 
 export interface GCDefaultStyle {
@@ -123,11 +129,16 @@ export interface GCSpreadSheetsWorkbookConstructor {
   new (host: HTMLElement, options?: object): GCSpreadWorkbook
 }
 
+export interface GCSpreadSheetsEvents {
+  ValidationError: string
+}
+
 export interface GCSpreadSheets {
   Workbook: GCSpreadSheetsWorkbookConstructor
   Designer: GCSpreadDesignerConstructor | { Designer: GCSpreadDesignerConstructor; DefaultConfig: object }
   DataValidation: GCDataValidation
   Comments: { Comment: GCCommentConstructor }
+  Events: GCSpreadSheetsEvents
   LicenseKey: string
 }
 
