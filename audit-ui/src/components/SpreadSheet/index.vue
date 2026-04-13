@@ -81,7 +81,14 @@ async function initWorkbook() {
   try {
     workbook = new window.GC.Spread.Sheets.Workbook(spreadRef.value)
 
-    publishedVersion = await getPublishedVersion(props.templateId)
+    // ── Phase 1: fetch template version + submission in parallel ──────
+    const [fetchedVersion, fetchedSubmission] = await Promise.all([
+      getPublishedVersion(props.templateId),
+      getSubmission(props.templateId, props.auditYear),
+    ])
+    publishedVersion = fetchedVersion
+    currentSubmission = fetchedSubmission
+
     if (!publishedVersion?.templateJson) {
       errorMsg.value = '该模板尚未发布有效版本，请联系管理员'
       workbook.destroy()
@@ -90,29 +97,33 @@ async function initWorkbook() {
       return
     }
 
-    currentSubmission = await getSubmission(props.templateId, props.auditYear)
-
     const jsonStr = currentSubmission?.submissionJson ?? publishedVersion.templateJson
     workbook.fromJSON(JSON.parse(jsonStr))
 
-    // Pre-fill enterprise settings into tagged cells when loading a fresh template
-    if (!currentSubmission && publishedVersion.id) {
-      await prefillEnterpriseSettings(workbook, publishedVersion.id)
-    }
-
-    // Inject dictionary-based dropdown validators for EQUIPMENT_BENCHMARK and TABLE tags
+    // ── Phase 2: fetch tags + prefill data in parallel (one listTags call) ─
     if (publishedVersion.id) {
-      await applyDictValidators(workbook, publishedVersion.id)
-    }
+      const [tags, prefillData] = await Promise.all([
+        listTags(publishedVersion.id),
+        !currentSubmission ? getEnterpriseSettingPrefill() : Promise.resolve(null),
+      ])
 
-    // Bind ValidationError event on every sheet so invalid dropdown entries show
-    // an error dialog — the Workbook component (unlike the Designer) does not
-    // include built-in validation popups.
-    bindValidationErrorDialogs(workbook)
+      // Pre-fill enterprise settings (uses pre-fetched tags + prefillData)
+      if (!currentSubmission && prefillData) {
+        applyPrefill(workbook, tags, prefillData)
+      }
 
-    // Apply cell protection + required field markers (if protection is enabled)
-    if (publishedVersion.id && publishedVersion.protectionEnabled !== 0) {
-      await applyDataEntryProtection(workbook, publishedVersion.id)
+      // Inject dictionary-based dropdown validators (uses pre-fetched tags)
+      await applyDictValidators(workbook, tags)
+
+      // Bind ValidationError event on every sheet
+      bindValidationErrorDialogs(workbook)
+
+      // Apply cell protection + required field markers (uses pre-fetched tags)
+      if (publishedVersion.protectionEnabled !== 0) {
+        applyDataEntryProtection(workbook, tags)
+      }
+    } else {
+      bindValidationErrorDialogs(workbook)
     }
 
     const forceReadonly = props.readonly || currentSubmission?.status === 1
@@ -131,19 +142,15 @@ async function initWorkbook() {
 }
 
 /**
- * Pre-fill enterprise settings into SpreadJS cells that have tag mappings
- * targeting ent_enterprise_setting. This enables bidirectional sync:
- * enterprise settings page → SpreadJS template.
+ * Apply pre-fetched enterprise settings into SpreadJS cells.
+ * Uses pre-fetched tags (avoids duplicate listTags call).
  */
-async function prefillEnterpriseSettings(
+function applyPrefill(
   wb: import('@/types/spreadjs').GCSpreadWorkbook,
-  versionId: number,
+  tags: TplTagMapping[],
+  prefillData: Record<string, unknown>,
 ) {
   try {
-    const [tags, prefillData] = await Promise.all([
-      listTags(versionId),
-      getEnterpriseSettingPrefill(),
-    ])
     if (!prefillData || Object.keys(prefillData).length === 0) return
 
     // Filter to only ent_enterprise_setting SCALAR mappings
@@ -241,10 +248,9 @@ function fillTaggedCell(
  */
 async function applyDictValidators(
   wb: import('@/types/spreadjs').GCSpreadWorkbook,
-  versionId: number,
+  tags: TplTagMapping[],
 ) {
   try {
-    const tags = await listTags(versionId)
     // Collect all dictType references from EQUIPMENT_BENCHMARK columnMappings
     const dictTypesNeeded = new Set<string>()
     interface DropdownTarget {
@@ -408,12 +414,11 @@ const REQUIRED_BG = '#FFF3E0'
  *  3. Mark required fields with background colour + comment
  *  4. Enable sheet protection with options that still allow selecting cells
  */
-async function applyDataEntryProtection(
+function applyDataEntryProtection(
   wb: import('@/types/spreadjs').GCSpreadWorkbook,
-  versionId: number,
+  tags: TplTagMapping[],
 ) {
   try {
-    const tags = await listTags(versionId)
     if (!tags || tags.length === 0) return
     cachedTags = tags
 

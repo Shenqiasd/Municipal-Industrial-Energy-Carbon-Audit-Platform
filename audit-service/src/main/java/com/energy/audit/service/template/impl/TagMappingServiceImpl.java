@@ -9,6 +9,8 @@ import com.energy.audit.service.template.SpreadsheetDataExtractor;
 import com.energy.audit.service.template.TagMappingService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +35,7 @@ public class TagMappingServiceImpl implements TagMappingService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = "templateCache", key = "'tags:' + #templateVersionId")
     public void replaceAll(Long templateVersionId, List<TplTagMapping> mappings) {
         String operator = SecurityUtils.getRequiredCurrentUsername();
         tagMappingMapper.deleteByVersionId(templateVersionId, operator);
@@ -48,12 +51,14 @@ public class TagMappingServiceImpl implements TagMappingService {
     }
 
     @Override
+    @Cacheable(cacheNames = "templateCache", key = "'tags:' + #templateVersionId")
     public List<TplTagMapping> listByVersionId(Long templateVersionId) {
         return tagMappingMapper.selectListByVersionId(templateVersionId);
     }
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = "templateCache", key = "'tags:' + #versionId")
     public void syncFromTemplateJson(Long versionId, String templateJson) {
         String operator = SecurityUtils.getRequiredCurrentUsername();
         List<DiscoveredField> discoveredFields = extractor.discoverFields(templateJson);

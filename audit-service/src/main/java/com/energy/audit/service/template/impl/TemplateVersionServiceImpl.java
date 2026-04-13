@@ -11,6 +11,7 @@ import com.energy.audit.model.entity.template.TplTemplateVersion;
 import com.energy.audit.service.template.TagMappingService;
 import com.energy.audit.service.template.TemplateVersionService;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -139,6 +140,7 @@ public class TemplateVersionServiceImpl implements TemplateVersionService {
     }
 
     @Override
+    @Cacheable(cacheNames = "templateCache", key = "'published:' + #templateId")
     public TplTemplateVersion getPublished(Long templateId) {
         return versionMapper.selectPublishedByTemplateId(templateId);
     }
