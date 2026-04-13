@@ -671,8 +671,20 @@ function enterReadonly() {
 function applyReadonlyProtection() {
   if (!workbook) return
   const count = workbook.getSheetCount()
-  for (let i = 0; i < count; i++) {
-    workbook.getSheet(i).options.isProtected = true
+  workbook.suspendPaint()
+  try {
+    for (let i = 0; i < count; i++) {
+      const sheet = workbook.getSheet(i)
+      // Re-lock ALL cells (including those unlocked by applyDataEntryProtection)
+      const rows = sheet.getRowCount()
+      const cols = sheet.getColumnCount()
+      if (rows > 0 && cols > 0) {
+        sheet.getRange(0, 0, rows, cols).locked(true)
+      }
+      sheet.options.isProtected = true
+    }
+  } finally {
+    workbook.resumePaint()
   }
 }
 

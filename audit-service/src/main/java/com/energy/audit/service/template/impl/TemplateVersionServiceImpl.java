@@ -65,6 +65,10 @@ public class TemplateVersionServiceImpl implements TemplateVersionService {
         v.setVersion(nextVersion);
         v.setTemplateJson(inheritedJson);
         v.setPublished(0);
+        // Inherit protectionEnabled from the previous version
+        if (previousVersion != null && previousVersion.getProtectionEnabled() != null) {
+            v.setProtectionEnabled(previousVersion.getProtectionEnabled());
+        }
         v.setCreateBy(operator);
         v.setUpdateBy(operator);
         versionMapper.insert(v);
