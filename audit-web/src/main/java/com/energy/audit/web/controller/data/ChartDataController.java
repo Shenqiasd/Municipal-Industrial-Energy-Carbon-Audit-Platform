@@ -35,12 +35,15 @@ public class ChartDataController {
     public R<List<Map<String, Object>>> energyStructure(@RequestParam Integer auditYear) {
         requireEnterprise();
         Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
+        // Prefer standard_coal_equiv (tce) if populated; fallback to consumption_amount (raw units)
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-            "SELECT energy_name AS name, consumption_amount AS value " +
+            "SELECT energy_name AS name, " +
+            "COALESCE(standard_coal_equiv, consumption_amount) AS value, " +
+            "CASE WHEN standard_coal_equiv IS NOT NULL AND standard_coal_equiv > 0 THEN 'tce' ELSE measurement_unit END AS unit " +
             "FROM de_energy_balance WHERE enterprise_id = ? AND audit_year = ? AND deleted = 0 " +
             "AND energy_name IS NOT NULL AND energy_name <> '' " +
-            "AND consumption_amount IS NOT NULL AND consumption_amount > 0 " +
-            "ORDER BY consumption_amount DESC",
+            "AND (standard_coal_equiv > 0 OR consumption_amount > 0) " +
+            "ORDER BY COALESCE(standard_coal_equiv, consumption_amount) DESC",
             enterpriseId, auditYear
         );
         return R.ok(rows);
@@ -71,17 +74,33 @@ public class ChartDataController {
     public R<List<Map<String, Object>>> productConsumption(@RequestParam Integer auditYear) {
         requireEnterprise();
         Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-            "SELECT indicator_name AS productName, " +
-            "current_indicator AS unitConsumption, previous_indicator AS baseConsumption, " +
-            "current_numerator AS energyConsumption, current_denominator AS output, " +
-            "numerator_unit AS energyUnit, denominator_unit AS outputUnit " +
-            "FROM de_product_unit_consumption " +
-            "WHERE enterprise_id = ? AND audit_year = ? AND deleted = 0 " +
-            "AND indicator_name IS NOT NULL AND indicator_name <> '' " +
-            "ORDER BY indicator_name",
-            enterpriseId, auditYear
-        );
+        // Try wave4 schema first (indicator_name, current_indicator, ...)
+        // Fallback to canonical schema (product_name, year_type, unit_consumption, ...)
+        List<Map<String, Object>> rows;
+        try {
+            rows = jdbcTemplate.queryForList(
+                "SELECT indicator_name AS productName, " +
+                "current_indicator AS unitConsumption, previous_indicator AS baseConsumption, " +
+                "current_numerator AS energyConsumption, current_denominator AS output, " +
+                "numerator_unit AS energyUnit, denominator_unit AS outputUnit " +
+                "FROM de_product_unit_consumption " +
+                "WHERE enterprise_id = ? AND audit_year = ? AND deleted = 0 " +
+                "AND indicator_name IS NOT NULL AND indicator_name <> '' " +
+                "ORDER BY indicator_name",
+                enterpriseId, auditYear
+            );
+        } catch (Exception e) {
+            // Canonical schema fallback: product_name, year_type, unit_consumption
+            rows = jdbcTemplate.queryForList(
+                "SELECT COALESCE(product_name, CAST(product_id AS CHAR)) AS productName, " +
+                "unit_consumption AS unitConsumption, energy_consumption AS energyConsumption, " +
+                "output, measurement_unit AS energyUnit, year_type AS yearType " +
+                "FROM de_product_unit_consumption " +
+                "WHERE enterprise_id = ? AND audit_year = ? AND deleted = 0 " +
+                "ORDER BY product_name, year_type",
+                enterpriseId, auditYear
+            );
+        }
         return R.ok(rows);
     }
 

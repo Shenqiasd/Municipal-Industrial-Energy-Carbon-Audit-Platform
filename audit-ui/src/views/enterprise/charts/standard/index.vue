@@ -43,11 +43,16 @@ async function loadEnergyStructure() {
       structureOption.value = emptyOption('暂无能源消费数据')
       return
     }
-    const total = data.reduce((s: number, d: any) => s + (d.STANDARD_COAL_EQUIV || d.VALUE || d.value || 0), 0)
+    const total = data.reduce((s: number, d: any) => s + (d.VALUE || d.value || 0), 0)
+    // Detect unit: if backend returns 'tce' unit, use it; otherwise show generic label
+    const firstUnit = data[0]?.UNIT || data[0]?.unit || ''
+    const isTce = firstUnit === 'tce'
+    const unitLabel = isTce ? 'tce' : '消耗量'
+    const subtextLabel = isTce ? '总能耗 (折标煤)' : '总能源消耗'
     structureOption.value = {
       tooltip: {
         trigger: 'item',
-        formatter: (p: any) => `${p.name}: ${p.value.toFixed(1)} tce (${p.percent}%)`,
+        formatter: (p: any) => `${p.name}: ${p.value.toFixed(1)} ${unitLabel} (${p.percent}%)`,
       },
       legend: { orient: 'vertical', right: 20, top: 'center' },
       series: [
@@ -60,13 +65,13 @@ async function loadEnergyStructure() {
           label: { show: true, formatter: '{b}\n{d}%' },
           data: data.map((d: any) => ({
             name: d.NAME || d.name,
-            value: d.STANDARD_COAL_EQUIV || d.VALUE || d.value,
+            value: d.VALUE || d.value,
           })),
         },
       ],
       title: {
-        text: `${total.toFixed(0)} tce`,
-        subtext: '总能耗 (折标煤)',
+        text: `${total.toFixed(0)} ${unitLabel}`,
+        subtext: subtextLabel,
         left: '40%',
         top: '38%',
         textAlign: 'center',
