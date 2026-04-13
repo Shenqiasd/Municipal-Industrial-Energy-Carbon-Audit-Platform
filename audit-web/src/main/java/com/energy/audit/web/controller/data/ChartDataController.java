@@ -36,10 +36,11 @@ public class ChartDataController {
         requireEnterprise();
         Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-            "SELECT energy_name AS name, standard_coal AS value " +
-            "FROM de_energy_consumption WHERE enterprise_id = ? AND audit_year = ? AND deleted = 0 " +
-            "AND standard_coal IS NOT NULL AND standard_coal > 0 " +
-            "ORDER BY standard_coal DESC",
+            "SELECT energy_name AS name, consumption_amount AS value " +
+            "FROM de_energy_balance WHERE enterprise_id = ? AND audit_year = ? AND deleted = 0 " +
+            "AND energy_name IS NOT NULL AND energy_name <> '' " +
+            "AND consumption_amount IS NOT NULL AND consumption_amount > 0 " +
+            "ORDER BY consumption_amount DESC",
             enterpriseId, auditYear
         );
         return R.ok(rows);
@@ -71,12 +72,14 @@ public class ChartDataController {
         requireEnterprise();
         Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-            "SELECT p.name AS productName, d.year_type AS yearType, " +
-            "d.output, d.energy_consumption AS energyConsumption, d.unit_consumption AS unitConsumption " +
-            "FROM de_product_unit_consumption d " +
-            "JOIN bs_product p ON p.id = d.product_id " +
-            "WHERE d.enterprise_id = ? AND d.audit_year = ? AND d.deleted = 0 " +
-            "ORDER BY p.name, d.year_type",
+            "SELECT indicator_name AS productName, " +
+            "current_indicator AS unitConsumption, previous_indicator AS baseConsumption, " +
+            "current_numerator AS energyConsumption, current_denominator AS output, " +
+            "numerator_unit AS energyUnit, denominator_unit AS outputUnit " +
+            "FROM de_product_unit_consumption " +
+            "WHERE enterprise_id = ? AND audit_year = ? AND deleted = 0 " +
+            "AND indicator_name IS NOT NULL AND indicator_name <> '' " +
+            "ORDER BY indicator_name",
             enterpriseId, auditYear
         );
         return R.ok(rows);
@@ -87,14 +90,31 @@ public class ChartDataController {
     public R<List<Map<String, Object>>> ghgEmission(@RequestParam Integer auditYear) {
         requireEnterprise();
         Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-            "SELECT d.emission_category AS emissionType, d.source_name AS energyName, " +
-            "d.co2_emission AS annualEmission " +
-            "FROM de_carbon_emission d " +
-            "WHERE d.enterprise_id = ? AND d.audit_year = ? AND d.deleted = 0 " +
-            "ORDER BY d.emission_category, d.co2_emission DESC",
-            enterpriseId, auditYear
-        );
+
+        // Try de_ghg_emission first (schema.sql table with emission_type/annual_emission)
+        List<Map<String, Object>> rows;
+        try {
+            rows = jdbcTemplate.queryForList(
+                "SELECT emission_type AS emissionType, " +
+                "main_equipment AS energyName, annual_emission AS annualEmission " +
+                "FROM de_ghg_emission " +
+                "WHERE enterprise_id = ? AND audit_year = ? AND deleted = 0 " +
+                "AND annual_emission IS NOT NULL AND annual_emission > 0 " +
+                "ORDER BY emission_type, annual_emission DESC",
+                enterpriseId, auditYear
+            );
+        } catch (Exception e) {
+            // Fallback to de_carbon_emission (wave4 migration table)
+            rows = jdbcTemplate.queryForList(
+                "SELECT emission_category AS emissionType, source_name AS energyName, " +
+                "co2_emission AS annualEmission " +
+                "FROM de_carbon_emission " +
+                "WHERE enterprise_id = ? AND audit_year = ? AND deleted = 0 " +
+                "AND co2_emission IS NOT NULL AND co2_emission > 0 " +
+                "ORDER BY emission_category, co2_emission DESC",
+                enterpriseId, auditYear
+            );
+        }
         return R.ok(rows);
     }
 
@@ -122,13 +142,23 @@ public class ChartDataController {
 
         try {
             Map<String, Object> ghgTotal = jdbcTemplate.queryForMap(
-                "SELECT SUM(co2_emission) AS totalEmission, COUNT(*) AS sourceCount " +
-                "FROM de_carbon_emission WHERE enterprise_id = ? AND audit_year = ? AND deleted = 0",
+                "SELECT SUM(annual_emission) AS totalEmission, COUNT(*) AS sourceCount " +
+                "FROM de_ghg_emission WHERE enterprise_id = ? AND audit_year = ? AND deleted = 0",
                 enterpriseId, auditYear
             );
             result.put("ghgTotal", ghgTotal);
-        } catch (org.springframework.dao.EmptyResultDataAccessException e) {
-            result.put("ghgTotal", null);
+        } catch (Exception e) {
+            // Fallback to de_carbon_emission if de_ghg_emission doesn't exist
+            try {
+                Map<String, Object> ghgTotal = jdbcTemplate.queryForMap(
+                    "SELECT SUM(co2_emission) AS totalEmission, COUNT(*) AS sourceCount " +
+                    "FROM de_carbon_emission WHERE enterprise_id = ? AND audit_year = ? AND deleted = 0",
+                    enterpriseId, auditYear
+                );
+                result.put("ghgTotal", ghgTotal);
+            } catch (Exception ex) {
+                result.put("ghgTotal", null);
+            }
         }
 
         return R.ok(result);
