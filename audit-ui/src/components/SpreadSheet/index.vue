@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import {
   getPublishedVersion,
   getSubmission,
@@ -103,6 +104,11 @@ async function initWorkbook() {
     if (publishedVersion.id) {
       await applyDictValidators(workbook, publishedVersion.id)
     }
+
+    // Bind ValidationError event on every sheet so invalid dropdown entries show
+    // an error dialog — the Workbook component (unlike the Designer) does not
+    // include built-in validation popups.
+    bindValidationErrorDialogs(workbook)
 
     // Apply cell protection + required field markers (if protection is enabled)
     if (publishedVersion.id && publishedVersion.protectionEnabled !== 0) {
@@ -329,6 +335,9 @@ async function applyDictValidators(
         dv.showInputMessage(true)
         dv.inputTitle('请选择')
         dv.inputMessage('点击下拉箭头选择')
+        dv.showErrorMessage(true)
+        dv.errorTitle('输入错误')
+        dv.errorMessage('请输入下拉列表中的值')
 
         // Find target sheet
         const sheet = findSheet(wb, target.sheetName, target.sheetIndex)
@@ -344,6 +353,48 @@ async function applyDictValidators(
   } catch (e) {
     // Dropdown injection is best-effort; don't block template loading
     console.warn('[dropdown] failed to apply dict validators:', e)
+  }
+}
+
+/**
+ * Bind the SpreadJS ValidationError event on every sheet so that entering an
+ * invalid value in a cell with DataValidation (e.g. a dropdown list) shows an
+ * error dialog to the user.
+ *
+ * The SpreadJS *Designer* component has built-in validation popups, but the
+ * plain *Workbook* component does not — we must handle the event ourselves.
+ * When the validator's errorStyle is "stop", we also cancel the edit so the
+ * invalid value is rejected (matching Excel / Designer behaviour).
+ */
+function bindValidationErrorDialogs(
+  wb: import('@/types/spreadjs').GCSpreadWorkbook,
+) {
+  const Events = window.GC?.Spread?.Sheets?.Events
+  if (!Events?.ValidationError) return
+
+  const sheetCount = wb.getSheetCount()
+  for (let i = 0; i < sheetCount; i++) {
+    const sheet = wb.getSheet(i)
+    sheet.bind(Events.ValidationError, (_sender: unknown, args: {
+      validationResult?: number
+      validator?: { errorTitle?(): string; errorMessage?(): string; errorStyle?(): number }
+      row?: number
+      col?: number
+    }) => {
+      const dv = args.validator
+      const title = dv?.errorTitle?.() || '错误提示'
+      const message = dv?.errorMessage?.() || '请输入下拉列表中的值'
+      // errorStyle: 0 = stop (reject), 1 = warning, 2 = information
+      const style = dv?.errorStyle?.() ?? 0
+      if (style === 0) {
+        // Reject the invalid value by reverting the cell edit
+        args.validationResult = 1 // GC.Spread.Sheets.DataValidation.DataValidationResult.forceApply → 0, discard → 1
+      }
+      ElMessageBox.alert(message, title, {
+        type: style === 0 ? 'error' : 'warning',
+        confirmButtonText: '确定',
+      })
+    })
   }
 }
 
