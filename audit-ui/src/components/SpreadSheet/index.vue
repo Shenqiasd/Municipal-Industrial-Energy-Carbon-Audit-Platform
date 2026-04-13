@@ -433,6 +433,10 @@ function applyDataEntryProtection(
     if (!tags || tags.length === 0) return
     cachedTags = tags
 
+    const scalarCount = tags.filter(t => (t.mappingType ?? 'SCALAR') === 'SCALAR').length
+    const tableCount = tags.length - scalarCount
+    console.log(`[protection] 收到 ${tags.length} 个 tag mappings (SCALAR: ${scalarCount}, TABLE/BENCH: ${tableCount})`)
+
     wb.suspendPaint()
     try {
       const sheetCount = wb.getSheetCount()
@@ -447,15 +451,29 @@ function applyDataEntryProtection(
       }
 
       // Step 2 & 3: Unlock mapped cells and mark required ones
+      // Each tag is wrapped in its own try-catch so one failure
+      // does NOT prevent remaining tags from being unlocked.
+      let unlocked = 0
+      let failed = 0
       for (const tag of tags) {
-        const mappingType = tag.mappingType ?? 'SCALAR'
+        try {
+          const mappingType = tag.mappingType ?? 'SCALAR'
 
-        if (mappingType === 'SCALAR') {
-          unlockScalarCell(wb, tag)
-        } else if (mappingType === 'TABLE' || mappingType === 'EQUIPMENT_BENCHMARK') {
-          unlockTableRange(wb, tag)
+          if (mappingType === 'SCALAR') {
+            unlockScalarCell(wb, tag)
+          } else if (mappingType === 'TABLE' || mappingType === 'EQUIPMENT_BENCHMARK') {
+            unlockTableRange(wb, tag)
+          }
+          unlocked++
+        } catch (e) {
+          failed++
+          console.warn(`[protection] 解锁 tag 失败: ${tag.tagName} (${tag.mappingType}/${tag.sourceType})`, e)
         }
       }
+      if (failed > 0) {
+        console.warn(`[protection] ${failed}/${tags.length} 个 tag 解锁失败`)
+      }
+      console.log(`[protection] 解锁完成: 成功 ${unlocked}, 失败 ${failed}`)
 
       // Step 4: Enable sheet protection on every sheet
       for (let si = 0; si < sheetCount; si++) {
@@ -540,27 +558,82 @@ function unlockScalarCell(
       }
     }
   }
+  console.warn(
+    `[protection] SCALAR tag 未找到匹配单元格: ${tag.tagName}`,
+    `(source=${tag.sourceType}, sheet=${tag.sheetName ?? tag.sheetIndex})`,
+  )
 }
 
 /**
  * Unlock the data range for a TABLE / EQUIPMENT_BENCHMARK mapping.
- * Also mark columns that are required.
+ *
+ * Resolution order:
+ *  1. For NAMED_RANGE sources — resolve the Named Range from the SpreadJS
+ *     workbook at runtime (more accurate than the stored cellRange which may
+ *     be stale after template edits).
+ *  2. Fall back to the stored `cellRange` from the database.
+ *  3. If neither works, log a warning and return.
  */
 function unlockTableRange(
   wb: import('@/types/spreadjs').GCSpreadWorkbook,
   tag: TplTagMapping,
 ) {
-  if (!tag.cellRange) return
-  const rangeMatch = tag.cellRange.toUpperCase().trim().match(/([A-Z]+)(\d+):([A-Z]+)(\d+)/)
-  if (!rangeMatch) return
+  let startRow: number | undefined
+  let endRow: number | undefined
+  let startCol: number | undefined
+  let endCol: number | undefined
+  let sheet: import('@/types/spreadjs').GCSpreadSheet | null = null
 
-  const startRow = parseInt(rangeMatch[2]) - 1
-  const endRow = parseInt(rangeMatch[4]) - 1
-  const startCol = letterToColIndex(rangeMatch[1])
-  const endCol = letterToColIndex(rangeMatch[3])
+  // ── Strategy 1: resolve Named Range at runtime ────────────────────────
+  if (tag.sourceType === 'NAMED_RANGE' && tag.tagName) {
+    const sheetCount = wb.getSheetCount()
+    // Try sheet-level custom names first
+    for (let si = 0; si < sheetCount; si++) {
+      const s = wb.getSheet(si)
+      const nr = s.getCustomName(tag.tagName)
+      if (nr && (nr.getRowCount() > 1 || nr.getColumnCount() > 1)) {
+        sheet = s
+        startRow = nr.getRow()
+        startCol = nr.getColumn()
+        endRow = startRow + nr.getRowCount() - 1
+        endCol = startCol + nr.getColumnCount() - 1
+        break
+      }
+    }
+    // Try workbook-level custom name
+    if (!sheet) {
+      const nr = wb.getCustomName(tag.tagName)
+      if (nr && (nr.getRowCount() > 1 || nr.getColumnCount() > 1)) {
+        sheet = findSheet(wb, tag.sheetName, tag.sheetIndex)
+        if (sheet) {
+          startRow = nr.getRow()
+          startCol = nr.getColumn()
+          endRow = startRow + nr.getRowCount() - 1
+          endCol = startCol + nr.getColumnCount() - 1
+        }
+      }
+    }
+  }
 
-  const sheet = findSheet(wb, tag.sheetName, tag.sheetIndex)
-  if (!sheet) return
+  // ── Strategy 2: fall back to stored cellRange ─────────────────────────
+  if (!sheet && tag.cellRange) {
+    const rangeMatch = tag.cellRange.toUpperCase().trim().match(/([A-Z]+)(\d+):([A-Z]+)(\d+)/)
+    if (rangeMatch) {
+      startRow = parseInt(rangeMatch[2]) - 1
+      endRow = parseInt(rangeMatch[4]) - 1
+      startCol = letterToColIndex(rangeMatch[1])
+      endCol = letterToColIndex(rangeMatch[3])
+      sheet = findSheet(wb, tag.sheetName, tag.sheetIndex)
+    }
+  }
+
+  if (!sheet || startRow == null || endRow == null || startCol == null || endCol == null) {
+    console.warn(
+      `[protection] TABLE tag 未能解析 sheet/range: ${tag.tagName}`,
+      `(source=${tag.sourceType}, cellRange=${tag.cellRange ?? 'null'}, sheet=${tag.sheetName ?? tag.sheetIndex})`,
+    )
+    return
+  }
 
   // Unlock the entire data range
   const rowCount = endRow - startRow + 1
@@ -715,13 +788,23 @@ function findSheet(
 ): import('@/types/spreadjs').GCSpreadSheet | null {
   const count = wb.getSheetCount()
   if (sheetName) {
+    const target = sheetName.trim()
+    // Exact match first
     for (let i = 0; i < count; i++) {
       const s = wb.getSheet(i)
-      if (s.name() === sheetName) return s
+      if (s.name() === target) return s
+    }
+    // Trimmed / case-insensitive fallback (handles encoding or whitespace diffs)
+    const targetLower = target.toLowerCase()
+    for (let i = 0; i < count; i++) {
+      const s = wb.getSheet(i)
+      if (s.name().trim().toLowerCase() === targetLower) return s
     }
   }
   const idx = sheetIndex ?? 0
-  return idx >= 0 && idx < count ? wb.getSheet(idx) : null
+  if (idx >= 0 && idx < count) return wb.getSheet(idx)
+  console.warn(`[protection] findSheet 失败: name=${sheetName}, index=${sheetIndex}, sheetCount=${count}`)
+  return null
 }
 
 function letterToColIndex(letters: string): number {
