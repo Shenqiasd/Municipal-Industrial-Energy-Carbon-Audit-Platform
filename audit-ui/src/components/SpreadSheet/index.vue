@@ -217,6 +217,7 @@ function applyConfigPrefill(
 ) {
   try {
     const prefillTags = tags.filter(t => t.mappingType === 'CONFIG_PREFILL')
+    console.log(`[config-prefill] found ${prefillTags.length} CONFIG_PREFILL tags`)
     if (!prefillTags.length) return
 
     wb.suspendPaint()
@@ -250,7 +251,7 @@ function applyOneConfigPrefill(
   // 2. Parse columnMappings JSON
   let config: {
     filter?: Record<string, unknown>
-    columns: Array<{ col: number; field: string; format?: string }>
+    columns: Array<{ col: string | number; field: string; format?: string }>
   }
   try {
     config = JSON.parse(tag.columnMappings)
@@ -300,6 +301,14 @@ function applyOneConfigPrefill(
   for (let i = 0; i < rowsToFill; i++) {
     const record = records[i]
     for (const colDef of columns) {
+      // Resolve column index: col can be a letter ("A") or a numeric offset (0)
+      let colIndex: number
+      if (typeof colDef.col === 'string' && /^[A-Za-z]+$/.test(colDef.col)) {
+        colIndex = letterToColIndex(colDef.col.toUpperCase())
+      } else {
+        colIndex = startCol + Number(colDef.col)
+      }
+
       let value: unknown
       if (colDef.format) {
         // Template string: "{name}（{measurementUnit}）"
@@ -308,7 +317,7 @@ function applyOneConfigPrefill(
         value = record[colDef.field]
       }
       if (value != null && value !== '') {
-        sheet.setValue(startRow + i, startCol + colDef.col, value)
+        sheet.setValue(startRow + i, colIndex, value)
       }
     }
   }
