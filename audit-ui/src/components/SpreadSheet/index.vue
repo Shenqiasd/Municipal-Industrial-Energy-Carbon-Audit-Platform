@@ -298,16 +298,20 @@ function applyOneConfigPrefill(
     )
   }
 
-  // 7. Build per-column dropdown value lists from ALL filtered records
+  // Helper: resolve column index from colDef (letter "A" → absolute, number → relative offset)
+  const resolveColIndex = (colDef: { col: string | number }) => {
+    if (typeof colDef.col === 'string' && /^[A-Za-z]+$/.test(colDef.col)) {
+      return letterToColIndex(colDef.col.toUpperCase())
+    }
+    return startCol + Number(colDef.col)
+  }
+
+  // 7. Build per-column deduplicated dropdown value lists from ALL filtered records
   const colDropdownValues = new Map<number, string[]>()
   for (const colDef of columns) {
-    let colIndex: number
-    if (typeof colDef.col === 'string' && /^[A-Za-z]+$/.test(colDef.col)) {
-      colIndex = letterToColIndex(colDef.col.toUpperCase())
-    } else {
-      colIndex = startCol + Number(colDef.col)
-    }
+    const colIndex = resolveColIndex(colDef)
     const values: string[] = []
+    const seen = new Set<string>()
     for (const rec of records) {
       let val: string
       if (colDef.format) {
@@ -315,7 +319,7 @@ function applyOneConfigPrefill(
       } else {
         val = rec[colDef.field] != null ? String(rec[colDef.field]) : ''
       }
-      if (val !== '') values.push(val)
+      if (val !== '' && !seen.has(val)) { seen.add(val); values.push(val) }
     }
     if (values.length > 0) {
       colDropdownValues.set(colIndex, values)
@@ -327,13 +331,7 @@ function applyOneConfigPrefill(
   for (let i = 0; i < rowsToFill; i++) {
     const record = records[i]
     for (const colDef of columns) {
-      // Resolve column index: col can be a letter ("A") or a numeric offset (0)
-      let colIndex: number
-      if (typeof colDef.col === 'string' && /^[A-Za-z]+$/.test(colDef.col)) {
-        colIndex = letterToColIndex(colDef.col.toUpperCase())
-      } else {
-        colIndex = startCol + Number(colDef.col)
-      }
+      const colIndex = resolveColIndex(colDef)
 
       let value: unknown
       if (colDef.format) {
@@ -372,12 +370,7 @@ function applyOneConfigPrefill(
     const extraRows = Math.min(maxRows, records.length + 20) // extend a few rows beyond data
     for (let i = rowsToFill; i < extraRows; i++) {
       for (const colDef of columns) {
-        let colIndex: number
-        if (typeof colDef.col === 'string' && /^[A-Za-z]+$/.test(colDef.col)) {
-          colIndex = letterToColIndex(colDef.col.toUpperCase())
-        } else {
-          colIndex = startCol + Number(colDef.col)
-        }
+        const colIndex = resolveColIndex(colDef)
         const dropdownVals = colDropdownValues.get(colIndex)
         if (dropdownVals?.length) {
           try {
