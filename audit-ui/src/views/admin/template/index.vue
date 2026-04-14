@@ -584,6 +584,7 @@ onMounted(loadData)
                   </div>
                 </div>
                 <el-select
+                  v-if="tag.mappingType !== 'CONFIG_PREFILL'"
                   v-model="tag.targetTable"
                   placeholder="选择目标表 (targetTable)"
                   size="small"
@@ -601,6 +602,7 @@ onMounted(loadData)
                   />
                 </el-select>
                 <el-select
+                  v-if="tag.mappingType !== 'CONFIG_PREFILL'"
                   v-model="tag.fieldName"
                   :placeholder="tag.targetTable ? '选择字段 (fieldName)' : '请先选择目标表'"
                   size="small"
