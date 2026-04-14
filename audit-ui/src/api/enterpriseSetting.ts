@@ -71,3 +71,15 @@ export function upsertEnterpriseSetting(data: Partial<EnterpriseSetting>): Promi
 export function getEnterpriseSettingPrefill(): Promise<Record<string, unknown>> {
   return request.get('/enterprise/setting/prefill')
 }
+
+/** Config data for CONFIG_PREFILL tag mappings */
+export interface ConfigPrefillData {
+  bs_energy: Array<Record<string, unknown>>
+  bs_product: Array<Record<string, unknown>>
+  [key: string]: Array<Record<string, unknown>>
+}
+
+/** Get all config data (energy types + products) for CONFIG_PREFILL — no pagination */
+export function getConfigPrefillData(): Promise<ConfigPrefillData> {
+  return request.get('/enterprise/setting/config-prefill-data')
+}
