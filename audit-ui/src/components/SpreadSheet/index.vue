@@ -12,7 +12,7 @@ import {
   type TplTemplateVersion,
   type TplTagMapping,
 } from '@/api/template'
-import { getEnterpriseSettingPrefill } from '@/api/enterpriseSetting'
+import { getEnterpriseSettingPrefill, getConfigPrefillData, type ConfigPrefillData } from '@/api/enterpriseSetting'
 import { getDataByTypes, type DictData } from '@/api/dict'
 import { initSpreadJSLicense } from '@/utils/spreadjs-license'
 
@@ -106,16 +106,24 @@ async function initWorkbook() {
     // from rendering — matching the original best-effort error handling.
     if (publishedVersion.id) {
       try {
-        const [tags, prefillData] = await Promise.all([
+        const [tags, prefillData, configPrefillData] = await Promise.all([
           listTags(publishedVersion.id),
           !currentSubmission
             ? getEnterpriseSettingPrefill().catch(() => null)
+            : Promise.resolve(null),
+          !currentSubmission
+            ? getConfigPrefillData().catch(() => null)
             : Promise.resolve(null),
         ])
 
         // Pre-fill enterprise settings (uses pre-fetched tags + prefillData)
         if (!currentSubmission && prefillData) {
           applyPrefill(workbook, tags, prefillData)
+        }
+
+        // Config-driven prefill: fill rows from bs_energy / bs_product config
+        if (!currentSubmission && configPrefillData) {
+          applyConfigPrefill(workbook, tags, configPrefillData)
         }
 
         // Inject dictionary-based dropdown validators (uses pre-fetched tags)
@@ -195,6 +203,114 @@ function applyPrefill(
   } catch (e) {
     // Pre-fill is best-effort; don't block template loading
     console.warn('[prefill] failed to pre-fill enterprise settings:', e)
+  }
+}
+
+/**
+ * Config-driven prefill: for each CONFIG_PREFILL tag, fill rows from enterprise
+ * config data (bs_energy / bs_product) into the designated SpreadJS region.
+ */
+function applyConfigPrefill(
+  wb: import('@/types/spreadjs').GCSpreadWorkbook,
+  tags: TplTagMapping[],
+  configData: ConfigPrefillData,
+) {
+  try {
+    const prefillTags = tags.filter(t => t.mappingType === 'CONFIG_PREFILL')
+    if (!prefillTags.length) return
+
+    wb.suspendPaint()
+    try {
+      for (const tag of prefillTags) {
+        try {
+          applyOneConfigPrefill(wb, tag, configData)
+        } catch (e) {
+          console.warn(`[config-prefill] failed for tag "${tag.tagName}":`, e)
+        }
+      }
+    } finally {
+      wb.resumePaint()
+    }
+  } catch (e) {
+    console.warn('[config-prefill] failed:', e)
+  }
+}
+
+function applyOneConfigPrefill(
+  wb: import('@/types/spreadjs').GCSpreadWorkbook,
+  tag: TplTagMapping,
+  configData: ConfigPrefillData,
+) {
+  if (!tag.targetTable || !tag.cellRange || !tag.columnMappings) return
+
+  // 1. Get data source records
+  const allRecords = configData[tag.targetTable]
+  if (!allRecords?.length) return
+
+  // 2. Parse columnMappings JSON
+  let config: {
+    filter?: Record<string, unknown>
+    columns: Array<{ col: number; field: string; format?: string }>
+  }
+  try {
+    config = JSON.parse(tag.columnMappings)
+  } catch {
+    console.warn(`[config-prefill] invalid columnMappings JSON for tag "${tag.tagName}"`)
+    return
+  }
+  const columns = config.columns ?? []
+  if (!columns.length) return
+
+  // 3. Apply filter (e.g. { "isActive": 1 })
+  let records = allRecords
+  if (config.filter) {
+    const filterEntries = Object.entries(config.filter)
+    records = records.filter(r =>
+      filterEntries.every(([k, v]) => r[k] === v),
+    )
+  }
+  if (!records.length) return
+
+  // 4. Parse cellRange → startRow, startCol, maxRows
+  const rangeMatch = tag.cellRange.toUpperCase().trim().match(/([A-Z]+)(\d+):([A-Z]+)(\d+)/)
+  if (!rangeMatch) {
+    console.warn(`[config-prefill] invalid cellRange "${tag.cellRange}" for tag "${tag.tagName}"`)
+    return
+  }
+  const startRow = parseInt(rangeMatch[2]) - 1 // 0-based
+  const endRow = parseInt(rangeMatch[4]) - 1
+  const startCol = letterToColIndex(rangeMatch[1])
+  const maxRows = endRow - startRow + 1
+
+  // 5. Resolve sheet
+  const sheet = findSheet(wb, tag.sheetName, tag.sheetIndex)
+  if (!sheet) {
+    console.warn(`[config-prefill] sheet not found for tag "${tag.tagName}"`)
+    return
+  }
+
+  // 6. Fill rows (truncate if records exceed available rows)
+  const rowsToFill = Math.min(records.length, maxRows)
+  if (records.length > maxRows) {
+    console.warn(
+      `[config-prefill] "${tag.tagName}": ${records.length} records exceed ${maxRows} available rows, truncated`,
+    )
+  }
+
+  for (let i = 0; i < rowsToFill; i++) {
+    const record = records[i]
+    for (const colDef of columns) {
+      let value: unknown
+      if (colDef.format) {
+        // Template string: "{name}（{measurementUnit}）"
+        value = colDef.format.replace(/\{(\w+)\}/g, (_, key: string) => String(record[key] ?? ''))
+      } else {
+        value = record[colDef.field]
+      }
+      if (value != null && value !== '') {
+        sheet.setValue(startRow + i, startCol + colDef.col, value)
+      }
+    }
   }
 }
 

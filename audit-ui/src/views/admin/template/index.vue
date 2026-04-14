@@ -49,7 +49,32 @@ const DATA_TYPE_OPTIONS = [
 const MAPPING_TYPE_OPTIONS = [
   { label: '标量 (SCALAR)', value: 'SCALAR' },
   { label: '表格 (TABLE)', value: 'TABLE' },
+  { label: '配置预填充 (CONFIG_PREFILL)', value: 'CONFIG_PREFILL' },
 ]
+
+const CONFIG_PREFILL_DATA_SOURCES = [
+  { label: '能源品种 (bs_energy)', value: 'bs_energy' },
+  { label: '产品设置 (bs_product)', value: 'bs_product' },
+]
+
+/** Available fields for CONFIG_PREFILL per data source */
+const CONFIG_PREFILL_FIELDS: Record<string, Array<{ value: string; label: string }>> = {
+  bs_energy: [
+    { value: 'name', label: '能源名称 (name)' },
+    { value: 'category', label: '能源类别 (category)' },
+    { value: 'measurementUnit', label: '计量单位 (measurementUnit)' },
+    { value: 'equivalentValue', label: '当量值 (equivalentValue)' },
+    { value: 'equalValue', label: '等价值 (equalValue)' },
+    { value: 'lowHeatValue', label: '低位热值 (lowHeatValue)' },
+    { value: 'carbonContent', label: '单位热值含碳量 (carbonContent)' },
+    { value: 'oxidationRate', label: '氧化率 (oxidationRate)' },
+  ],
+  bs_product: [
+    { value: 'name', label: '产品名称 (name)' },
+    { value: 'measurementUnit', label: '计量单位 (measurementUnit)' },
+    { value: 'unitPrice', label: '单价 (unitPrice)' },
+  ],
+}
 
 const SOURCE_TYPE_LABELS: Record<string, string> = {
   NAMED_RANGE: 'Named Range',
@@ -279,6 +304,16 @@ function handleDesignerClose() {
 }
 
 const isReadonly = (v: TplTemplateVersion | null) => v?.published === 1
+
+function configPrefillPlaceholder(targetTable?: string): string {
+  if (targetTable === 'bs_energy') {
+    return '{"filter":{"isActive":1},"columns":[{"col":0,"field":"name"},{"col":1,"field":"measurementUnit"}]}'
+  }
+  if (targetTable === 'bs_product') {
+    return '{"columns":[{"col":0,"field":"name"}]}'
+  }
+  return '{"columns":[{"col":0,"field":"name"}]}'
+}
 
 async function handleDeleteTag(tag: TplTagMapping, index: number) {
   await ElMessageBox.confirm(
@@ -540,8 +575,8 @@ onMounted(loadData)
                     <el-tag size="small" :type="tag.sourceType === 'NAMED_RANGE' ? 'success' : 'warning'" effect="plain">
                       {{ SOURCE_TYPE_LABELS[tag.sourceType ?? 'CELL_TAG'] ?? tag.sourceType }}
                     </el-tag>
-                    <el-tag size="small" :type="tag.mappingType === 'TABLE' ? 'primary' : 'info'" effect="plain">
-                      {{ tag.mappingType === 'TABLE' ? '表格' : '标量' }}
+                    <el-tag size="small" :type="tag.mappingType === 'TABLE' ? 'primary' : tag.mappingType === 'CONFIG_PREFILL' ? 'warning' : 'info'" effect="plain">
+                      {{ tag.mappingType === 'TABLE' ? '表格' : tag.mappingType === 'CONFIG_PREFILL' ? '配置预填' : '标量' }}
                     </el-tag>
                     <el-tag v-if="tag.sheetName" size="small" effect="plain">
                       {{ tag.sheetName }}
@@ -549,6 +584,7 @@ onMounted(loadData)
                   </div>
                 </div>
                 <el-select
+                  v-if="tag.mappingType !== 'CONFIG_PREFILL'"
                   v-model="tag.targetTable"
                   placeholder="选择目标表 (targetTable)"
                   size="small"
@@ -566,6 +602,7 @@ onMounted(loadData)
                   />
                 </el-select>
                 <el-select
+                  v-if="tag.mappingType !== 'CONFIG_PREFILL'"
                   v-model="tag.fieldName"
                   :placeholder="tag.targetTable ? '选择字段 (fieldName)' : '请先选择目标表'"
                   size="small"
@@ -625,6 +662,49 @@ onMounted(loadData)
                   style="margin-top:4px"
                   v-if="tag.dataType === 'DICT'"
                 />
+                <!-- CONFIG_PREFILL-specific configuration -->
+                <div v-if="tag.mappingType === 'CONFIG_PREFILL'" class="table-config" style="border-color:#e6a23c">
+                  <div class="table-config-title" style="color:#e6a23c">配置预填充</div>
+                  <el-select
+                    v-model="tag.targetTable"
+                    placeholder="数据源表"
+                    size="small"
+                    :disabled="isReadonly(designerVersion)"
+                    style="width:100%;margin-top:4px"
+                  >
+                    <el-option
+                      v-for="opt in CONFIG_PREFILL_DATA_SOURCES"
+                      :key="opt.value"
+                      :label="opt.label"
+                      :value="opt.value"
+                    />
+                  </el-select>
+                  <el-input
+                    v-model="tag.cellRange"
+                    placeholder="填充范围 (如 A5:H30)"
+                    size="small"
+                    :disabled="isReadonly(designerVersion)"
+                    style="margin-top:4px"
+                  />
+                  <el-input
+                    v-model="tag.sheetName"
+                    placeholder="Sheet 名称（可选，留空则用 sheetIndex）"
+                    size="small"
+                    :disabled="isReadonly(designerVersion)"
+                    style="margin-top:4px"
+                  />
+                  <el-input
+                    v-model="tag.columnMappings"
+                    type="textarea"
+                    :rows="5"
+                    :placeholder="configPrefillPlaceholder(tag.targetTable)"
+                    :disabled="isReadonly(designerVersion)"
+                    style="margin-top:4px"
+                  />
+                  <div style="margin-top:4px;font-size:11px;color:#909399">
+                    可用字段：{{ (CONFIG_PREFILL_FIELDS[tag.targetTable ?? ''] ?? []).map(f => f.value).join(', ') || '请先选择数据源表' }}
+                  </div>
+                </div>
                 <!-- TABLE-specific configuration -->
                 <div v-if="tag.mappingType === 'TABLE'" class="table-config">
                   <div class="table-config-title">表格配置</div>

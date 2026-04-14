@@ -3,7 +3,11 @@ package com.energy.audit.web.controller.enterprise;
 import com.energy.audit.common.result.R;
 import com.energy.audit.common.util.SecurityUtils;
 import com.energy.audit.model.entity.enterprise.EntEnterpriseSetting;
+import com.energy.audit.model.entity.setting.BsEnergy;
+import com.energy.audit.model.entity.setting.BsProduct;
 import com.energy.audit.service.enterprise.EnterpriseSettingService;
+import com.energy.audit.service.setting.EnergySettingService;
+import com.energy.audit.service.setting.ProductSettingService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -14,6 +18,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -25,11 +31,17 @@ import java.util.Map;
 public class EnterpriseSettingController {
 
     private final EnterpriseSettingService settingService;
+    private final EnergySettingService energySettingService;
+    private final ProductSettingService productSettingService;
     private final ObjectMapper objectMapper;
 
     public EnterpriseSettingController(EnterpriseSettingService settingService,
+                                       EnergySettingService energySettingService,
+                                       ProductSettingService productSettingService,
                                        ObjectMapper objectMapper) {
         this.settingService = settingService;
+        this.energySettingService = energySettingService;
+        this.productSettingService = productSettingService;
         this.objectMapper = objectMapper;
     }
 
@@ -75,5 +87,24 @@ public class EnterpriseSettingController {
         // Remove null values to keep response clean
         map.values().removeIf(v -> v == null);
         return R.ok(map);
+    }
+
+    /**
+     * Returns all config data (energy types + products) for CONFIG_PREFILL tag mappings.
+     * No pagination — config data is small (typically < 50 records per table).
+     */
+    @Operation(summary = "Get config data for CONFIG_PREFILL (energy types + products)")
+    @GetMapping("/config-prefill-data")
+    public R<Map<String, Object>> getConfigPrefillData() {
+        BsEnergy energyQuery = new BsEnergy();
+        List<BsEnergy> energies = energySettingService.list(energyQuery);
+
+        BsProduct productQuery = new BsProduct();
+        List<BsProduct> products = productSettingService.list(productQuery);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("bs_energy", energies);
+        result.put("bs_product", products);
+        return R.ok(result);
     }
 }
