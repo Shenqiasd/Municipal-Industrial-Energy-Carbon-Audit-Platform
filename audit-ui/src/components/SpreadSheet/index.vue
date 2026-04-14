@@ -262,6 +262,7 @@ function applyOneConfigPrefill(
   }
   const columns = config.columns ?? []
   if (!columns.length) return
+  const isDropdownOnly = config.mode === 'dropdown_only'
 
   // 3. Apply filter (e.g. { "isActive": 1 })
   let records = allRecords
@@ -271,8 +272,8 @@ function applyOneConfigPrefill(
       filterEntries.every(([k, v]) => r[k] === v),
     )
   }
-  // For dropdown_only mode with extraSources, we can proceed even if primary records are empty
-  // For prefill mode, we need records to fill values
+  // For prefill mode, we need records to fill values; for dropdown_only, proceed even if empty
+  if (!records.length && !isDropdownOnly) return
 
   // 4. Parse cellRange → startRow, startCol, maxRows
   const rangeMatch = tag.cellRange.toUpperCase().trim().match(/([A-Z]+)(\d+):([A-Z]+)(\d+)/)
@@ -293,7 +294,6 @@ function applyOneConfigPrefill(
   }
 
   // 6. Resolve column indices helper
-  const isDropdownOnly = config.mode === 'dropdown_only'
   const resolveColIndex = (colDef: { col: string | number }) => {
     if (typeof colDef.col === 'string' && /^[A-Za-z]+$/.test(colDef.col)) {
       return letterToColIndex(colDef.col.toUpperCase())
