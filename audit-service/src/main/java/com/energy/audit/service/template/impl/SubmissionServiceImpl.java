@@ -157,31 +157,32 @@ public class SubmissionServiceImpl implements SubmissionService {
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public void extractForDraft(Long submissionId, Long templateVersionId) {
         if (templateVersionId == null) return;
+
+        TplSubmission sub = submissionMapper.selectById(submissionId);
+        if (sub == null) return;
+
+        List<TplTagMapping> mappings = tagMappingService.listByVersionId(templateVersionId);
+        if (mappings.isEmpty()) return;
+
+        Map<String, Object> extracted = dataExtractor.extractData(sub.getSubmissionJson(), mappings);
+        String extractedJson;
         try {
-            TplSubmission sub = submissionMapper.selectById(submissionId);
-            if (sub == null) return;
-
-            List<TplTagMapping> mappings = tagMappingService.listByVersionId(templateVersionId);
-            if (mappings.isEmpty()) return;
-
-            Map<String, Object> extracted = dataExtractor.extractData(sub.getSubmissionJson(), mappings);
-            String extractedJson = objectMapper.writeValueAsString(extracted);
-
-            dataPersistenceService.persistExtractedData(
-                    submissionId, sub.getEnterpriseId(), sub.getAuditYear(), extracted, mappings);
-
-            TplSubmission upd = new TplSubmission();
-            upd.setId(submissionId);
-            upd.setExtractedData(extractedJson);
-            upd.setUpdateBy(SecurityUtils.getRequiredCurrentUsername());
-            submissionMapper.updateById(upd);
-
-            log.info("Draft extraction succeeded for submission {} (versionId={})",
-                    submissionId, templateVersionId);
-        } catch (Exception e) {
-            log.warn("Draft extraction failed (non-blocking) for submission {}: {}",
-                    submissionId, e.getMessage());
+            extractedJson = objectMapper.writeValueAsString(extracted);
+        } catch (JsonProcessingException e) {
+            throw new BusinessException("草稿抽取序列化失败: " + e.getMessage());
         }
+
+        dataPersistenceService.persistExtractedData(
+                submissionId, sub.getEnterpriseId(), sub.getAuditYear(), extracted, mappings);
+
+        TplSubmission upd = new TplSubmission();
+        upd.setId(submissionId);
+        upd.setExtractedData(extractedJson);
+        upd.setUpdateBy(SecurityUtils.getRequiredCurrentUsername());
+        submissionMapper.updateById(upd);
+
+        log.info("Draft extraction succeeded for submission {} (versionId={})",
+                submissionId, templateVersionId);
     }
 
     /** M-4: ensure submissionJson is well-formed JSON before persisting */
