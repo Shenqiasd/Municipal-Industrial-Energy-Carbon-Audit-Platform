@@ -63,13 +63,14 @@ public class SubmissionServiceImpl implements SubmissionService {
         TplSubmission existing = submissionMapper.selectByEnterpriseTemplateYear(
                 enterpriseId, templateId, auditYear);
         if (existing != null) {
-            // Allow overwriting even after submission — enterprise may need to correct data
-            if (existing.getStatus() == 1) {
-                // Use dedicated SQL to NULL out submit_time & extracted_data
+            // Allow overwriting after submission or rejection — enterprise may need to correct data
+            if (existing.getStatus() == 1 || existing.getStatus() == 3) {
+                // Use dedicated SQL to NULL out submit_time & extracted_data & review_comment
                 // (generic updateById skips null fields due to MyBatis <if> guards)
                 submissionMapper.resetToDraft(existing.getId(), operator);
                 existing.setStatus(0);
                 existing.setSubmitTime(null);
+                existing.setReviewComment(null);
             }
             existing.setSubmissionJson(submissionJson);
             existing.setTemplateVersion(templateVersion);
