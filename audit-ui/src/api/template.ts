@@ -60,6 +60,7 @@ export interface TplSubmission {
   submissionJson?: string
   extractedData?: string
   status?: number
+  reviewComment?: string
   submitTime?: string
   createTime?: string
   updateTime?: string

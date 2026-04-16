@@ -63,13 +63,19 @@ public class SubmissionServiceImpl implements SubmissionService {
         TplSubmission existing = submissionMapper.selectByEnterpriseTemplateYear(
                 enterpriseId, templateId, auditYear);
         if (existing != null) {
-            // Allow overwriting even after submission — enterprise may need to correct data
-            if (existing.getStatus() == 1) {
-                // Use dedicated SQL to NULL out submit_time & extracted_data
+            // Block modifications to approved submissions — data integrity after audit approval
+            if (existing.getStatus() == 2) {
+                throw new BusinessException("该模板已审核通过，不允许修改");
+            }
+            // Allow overwriting after submission or rejection — enterprise may need to correct data
+            if (existing.getStatus() == 1 || existing.getStatus() == 3) {
+                // Use dedicated SQL to NULL out submit_time & extracted_data & review_comment
                 // (generic updateById skips null fields due to MyBatis <if> guards)
                 submissionMapper.resetToDraft(existing.getId(), operator);
                 existing.setStatus(0);
                 existing.setSubmitTime(null);
+                existing.setReviewComment(null);
+                existing.setExtractedData(null);
             }
             existing.setSubmissionJson(submissionJson);
             existing.setTemplateVersion(templateVersion);
@@ -97,6 +103,10 @@ public class SubmissionServiceImpl implements SubmissionService {
         TplSubmission sub = submissionMapper.selectByIdAndEnterprise(submissionId, enterpriseId);
         if (sub == null) {
             throw new BusinessException("填报记录不存在或无权操作: " + submissionId);
+        }
+        // Block re-submission of approved submissions — data integrity after audit approval
+        if (sub.getStatus() == 2) {
+            throw new BusinessException("该模板已审核通过，不允许重新提交");
         }
         // Allow re-submission: re-extract with latest tag mappings and overwrite previous results
 
