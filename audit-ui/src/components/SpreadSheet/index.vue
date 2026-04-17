@@ -156,11 +156,13 @@ async function initWorkbook() {
       bindValidationErrorDialogs(workbook)
     }
 
-    // Only force readonly when explicitly set by the parent (e.g. lock held by
-    // another user).  A previously-submitted template (status===1) should remain
-    // editable when the current user holds the edit lock — the first saveDraft
-    // call will reset the submission back to draft (status=0).
-    const forceReadonly = props.readonly || (!ownsLock && currentSubmission?.status === 1)
+    // Force readonly when:
+    //  1. Parent explicitly says readonly (e.g. lock held by another user), OR
+    //  2. Submission has been submitted (status=1) or approved (status=2).
+    // A rejected submission (status=3) reverts to editable so the user can fix & re-submit.
+    const submissionStatus = currentSubmission?.status ?? 0
+    const isSubmittedOrApproved = submissionStatus === 1 || submissionStatus === 2
+    const forceReadonly = props.readonly || isSubmittedOrApproved
     if (forceReadonly) {
       applyReadonlyProtection()
       releaseLockIfOwned()
