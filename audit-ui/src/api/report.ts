@@ -69,9 +69,8 @@ export function generateReportFromTemplate(submissionId: number, flowChartImage?
   if (flowChartImage) {
     formData.append('flowChartImage', flowChartImage)
   }
-  return request.post('/report/generate-from-template', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
+  // Let axios auto-detect Content-Type with correct boundary for FormData
+  return request.post('/report/generate-from-template', formData)
 }
 
 /**

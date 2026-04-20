@@ -126,13 +126,7 @@ public class TemplateBasedReportBuilder {
         List<Object> bodyElements = body.getPArray().length > 0 ?
             new ArrayList<>() : new ArrayList<>();
 
-        // Iterate through all body elements using index-based loop (NodeList is not Iterable)
-        org.w3c.dom.NodeList bodyNodes = body.getDomNode().getChildNodes();
-        for (int idx = 0; idx < bodyNodes.getLength(); idx++) {
-            // Scan the XML directly for comment range starts
-        }
-
-        // Use XPath-like approach on the XML
+        // Scan the XML for comment range starts
         try {
             org.w3c.dom.NodeList children = body.getDomNode().getChildNodes();
             for (int i = 0; i < children.getLength(); i++) {

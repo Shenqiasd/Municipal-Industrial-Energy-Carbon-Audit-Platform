@@ -35,16 +35,17 @@ public class SpreadJSJsonParser {
                 return List.of();
             }
 
-            // Try exact match first, then fuzzy match (contains)
+            // Try exact match first, then prefix match (startsWith) to avoid false positives
+            // e.g., "1.企业概况" should NOT match "11.企业概况详细"
             JsonNode sheetNode = sheets.path(sheetName);
             if (sheetNode.isMissingNode()) {
-                // Fuzzy match: find sheet whose name contains the search string
+                // Prefix match: find sheet whose name starts with the search string, or vice versa
                 Iterator<Map.Entry<String, JsonNode>> fields = sheets.fields();
                 while (fields.hasNext()) {
                     Map.Entry<String, JsonNode> entry = fields.next();
-                    if (entry.getKey().contains(sheetName) || sheetName.contains(entry.getKey())) {
+                    if (entry.getKey().startsWith(sheetName) || sheetName.startsWith(entry.getKey())) {
                         sheetNode = entry.getValue();
-                        log.info("[SpreadJSParser] Fuzzy matched sheet '{}' for query '{}'", entry.getKey(), sheetName);
+                        log.info("[SpreadJSParser] Prefix matched sheet '{}' for query '{}'", entry.getKey(), sheetName);
                         break;
                     }
                 }
