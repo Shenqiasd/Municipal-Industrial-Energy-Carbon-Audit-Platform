@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getEnterpriseSetting, upsertEnterpriseSetting, type EnterpriseSetting } from '@/api/enterpriseSetting'
 import { INDUSTRY_CLASSIFICATION, buildIndustryLookup, type IndustryNode } from '@/config/industry-classification'
@@ -23,15 +23,6 @@ function resolveIndustryPath(code: string | undefined | null): string[] {
   const entry = industryLookup.get(code)
   return entry ? [...entry.fullPath] : []
 }
-
-/** Display label for the selected industry (code + name) */
-const industryDisplayLabel = computed(() => {
-  const path = industryCascaderValue.value
-  if (!path || path.length === 0) return ''
-  const lastCode = path[path.length - 1]
-  const entry = industryLookup.get(lastCode)
-  return entry ? entry.name : lastCode
-})
 
 /** Handle cascader selection change */
 function onIndustryChange(value: string[] | null) {
