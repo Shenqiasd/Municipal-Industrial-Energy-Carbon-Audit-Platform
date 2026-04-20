@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import DOMPurify from 'dompurify'
 import {
   listReportsForReview,
   getReportForReview,
@@ -141,6 +142,16 @@ async function handleDownload(report: ArReport) {
   }
 }
 
+function sanitizeHtml(html: string): string {
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'table', 'thead', 'tbody', 'tr', 'td', 'th',
+      'strong', 'em', 'b', 'i', 'u', 'br', 'hr', 'ul', 'ol', 'li', 'span', 'div', 'img', 'a',
+      'blockquote', 'pre', 'code', 'sub', 'sup', 'caption', 'colgroup', 'col'],
+    ALLOWED_ATTR: ['style', 'class', 'colspan', 'rowspan', 'src', 'alt', 'width', 'height', 'href', 'target', 'align', 'valign'],
+    ALLOW_DATA_ATTR: false,
+  })
+}
+
 onMounted(loadReports)
 </script>
 
@@ -255,7 +266,7 @@ onMounted(loadReports)
             <el-descriptions-item label="提交时间">{{ formatDate(detailReport.submitTime) }}</el-descriptions-item>
             <el-descriptions-item label="审核意见" :span="2">{{ detailReport.reviewComment || '—' }}</el-descriptions-item>
           </el-descriptions>
-          <div v-if="detailReport.reportHtml" class="report-html-preview" v-html="detailReport.reportHtml" />
+          <div v-if="detailReport.reportHtml" class="report-html-preview" v-html="sanitizeHtml(detailReport.reportHtml)" />
           <div v-else style="color: #909399; text-align: center; padding: 40px">
             报告内容为空
           </div>

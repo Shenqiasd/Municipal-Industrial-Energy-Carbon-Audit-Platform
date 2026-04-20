@@ -51,38 +51,42 @@ public class ReportServiceImpl implements ReportService {
     private String uploadDir;
 
     @Override
-    @Transactional
     public ArReport generateReport(Long enterpriseId, Integer auditYear, String username) {
-        ArReport record = reportMapper.selectByEnterpriseAndYear(enterpriseId, auditYear, 1);
-        if (record != null && record.getStatus() == 1) {
-            if (record.getUpdateTime() != null &&
-                record.getUpdateTime().plusMinutes(STUCK_TIMEOUT_MINUTES).isBefore(LocalDateTime.now())) {
-                log.warn("Report generation stuck for {}min, resetting status for enterprise={} year={}",
-                    STUCK_TIMEOUT_MINUTES, enterpriseId, auditYear);
-                record.setStatus(3);
-                record.setUpdateBy(username);
-                reportMapper.update(record);
-            } else {
-                throw new RuntimeException("报告正在生成中，请稍候");
+        // Phase 1: Init record in its own transaction (commits immediately, releases row lock)
+        ArReport record = new TransactionTemplate(transactionManager).execute(status -> {
+            ArReport existing = reportMapper.selectByEnterpriseAndYear(enterpriseId, auditYear, 1);
+            if (existing != null && existing.getStatus() == 1) {
+                if (existing.getUpdateTime() != null &&
+                    existing.getUpdateTime().plusMinutes(STUCK_TIMEOUT_MINUTES).isBefore(LocalDateTime.now())) {
+                    log.warn("Report generation stuck for {}min, resetting status for enterprise={} year={}",
+                        STUCK_TIMEOUT_MINUTES, enterpriseId, auditYear);
+                    existing.setStatus(3);
+                    existing.setUpdateBy(username);
+                    reportMapper.update(existing);
+                } else {
+                    throw new RuntimeException("报告正在生成中，请稍候");
+                }
             }
-        }
 
-        if (record == null) {
-            record = new ArReport();
-            record.setEnterpriseId(enterpriseId);
-            record.setAuditYear(auditYear);
-            record.setReportType(1);
-            record.setStatus(1);
-            record.setCreateBy(username);
-            record.setUpdateBy(username);
-            reportMapper.insert(record);
-            record = reportMapper.selectById(record.getId());
-        } else {
-            record.setStatus(1);
-            record.setUpdateBy(username);
-            reportMapper.update(record);
-        }
+            if (existing == null) {
+                existing = new ArReport();
+                existing.setEnterpriseId(enterpriseId);
+                existing.setAuditYear(auditYear);
+                existing.setReportType(1);
+                existing.setStatus(1);
+                existing.setCreateBy(username);
+                existing.setUpdateBy(username);
+                reportMapper.insert(existing);
+                return reportMapper.selectById(existing.getId());
+            } else {
+                existing.setStatus(1);
+                existing.setUpdateBy(username);
+                reportMapper.update(existing);
+                return existing;
+            }
+        });
 
+        // Phase 2: Heavy work outside any transaction (no row lock held)
         try {
             Map<String, Object> reportData = collectReportData(enterpriseId, auditYear);
 
@@ -97,12 +101,16 @@ public class ReportServiceImpl implements ReportService {
 
             WordReportBuilder.buildReport(filePath, reportName, auditYear, reportData);
 
-            record.setStatus(2);
-            record.setReportName(reportName);
-            record.setGeneratedFilePath(filePath.toString());
-            record.setGenerateTime(LocalDateTime.now());
-            record.setUpdateBy(username);
-            reportMapper.update(record);
+            // Phase 3: Commit success in its own transaction
+            final ArReport finalRecord = record;
+            new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                finalRecord.setStatus(2);
+                finalRecord.setReportName(reportName);
+                finalRecord.setGeneratedFilePath(filePath.toString());
+                finalRecord.setGenerateTime(LocalDateTime.now());
+                finalRecord.setUpdateBy(username);
+                reportMapper.update(finalRecord);
+            });
             return reportMapper.selectById(record.getId());
         } catch (Exception e) {
             log.error("Report generation failed for enterprise={} year={}", enterpriseId, auditYear, e);

@@ -69,11 +69,20 @@ public class ReportController {
     @Operation(summary = "Download report file")
     @GetMapping("/{id}/download")
     public ResponseEntity<byte[]> download(@PathVariable Long id) {
-        requireEnterprise();
-        Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
+        Integer userType = SecurityUtils.getCurrentUserType();
+        if (userType == null || (userType != 1 && userType != 2 && userType != 3)) {
+            throw new BusinessException("无权下载报告");
+        }
         ArReport report = reportService.getReport(id);
-        if (report == null || !report.getEnterpriseId().equals(enterpriseId)) {
+        if (report == null) {
             return ResponseEntity.notFound().build();
+        }
+        // Enterprise users can only download their own reports
+        if (userType == 3) {
+            Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
+            if (!report.getEnterpriseId().equals(enterpriseId)) {
+                return ResponseEntity.notFound().build();
+            }
         }
         byte[] content = reportService.downloadReport(id);
         String fileName = report.getReportName() + ".docx";
