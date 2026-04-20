@@ -405,7 +405,7 @@ public class ReportServiceImpl implements ReportService {
         if (report == null) {
             throw new BusinessException("报告不存在");
         }
-        if (report.getStatus() == null || report.getStatus() < 2) {
+        if (report.getStatus() == null || report.getStatus() < 2 || report.getStatus() == 3) {
             throw new BusinessException("报告尚未生成，不可提交审核");
         }
         if (report.getStatus() == 5) {

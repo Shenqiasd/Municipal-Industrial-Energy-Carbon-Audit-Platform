@@ -412,13 +412,17 @@ public class TemplateBasedReportBuilder {
     // ======================== Styling helpers ========================
 
     private static void styleTable(XWPFTable table, int colCount) {
-        // Set table width to full page width
-        CTTblWidth tw = table.getCTTbl().addNewTblPr().addNewTblW();
+        // Reuse existing tblPr (created by doc.createTable) to avoid duplicate elements
+        CTTblPr tblPr = table.getCTTbl().getTblPr();
+        if (tblPr == null) {
+            tblPr = table.getCTTbl().addNewTblPr();
+        }
+        CTTblWidth tw = tblPr.addNewTblW();
         tw.setType(STTblWidth.DXA);
         tw.setW(BigInteger.valueOf(9000)); // ~16cm
 
         // Set table borders
-        CTTblBorders borders = table.getCTTbl().getTblPr().addNewTblBorders();
+        CTTblBorders borders = tblPr.addNewTblBorders();
         setBorder(borders.addNewTop());
         setBorder(borders.addNewBottom());
         setBorder(borders.addNewLeft());
