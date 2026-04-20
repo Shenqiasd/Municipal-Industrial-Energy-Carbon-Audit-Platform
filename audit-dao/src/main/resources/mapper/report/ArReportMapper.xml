@@ -110,8 +110,13 @@
         ORDER BY r.create_time DESC
     </select>
 
-    <select id="selectByEnterpriseAndYear" resultMap="BaseResultMap">
-        SELECT * FROM ar_report
+    <select id="selectByEnterpriseAndYear" resultMap="LightResultMap">
+        SELECT id, enterprise_id, audit_year, report_name, report_type,
+               status, generated_file_path, uploaded_file_path,
+               generate_time, submit_time, template_id, submission_id,
+               flow_chart_path, review_comment, reviewer_id,
+               create_by, create_time, update_by, update_time, deleted
+        FROM ar_report
         WHERE enterprise_id = #{enterpriseId}
           AND audit_year = #{auditYear}
           AND report_type = #{reportType}

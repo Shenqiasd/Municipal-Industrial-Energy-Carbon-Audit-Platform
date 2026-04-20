@@ -93,12 +93,14 @@ public class TemplateBasedReportBuilder {
         Map<Integer, Integer> commentPositions = findCommentPositions(doc);
         log.info("[ReportBuilder] Found {} comment positions in template", commentPositions.size());
 
-        // Step 2: Process annotations in reverse order (to avoid position shifting)
-        List<Integer> sortedIds = new ArrayList<>(commentPositions.keySet());
-        sortedIds.sort(Collections.reverseOrder());
+        // Step 2: Process annotations in reverse body-index order (to avoid position shifting)
+        // Sort by body index (not comment ID) because comment IDs don't follow document order
+        List<Map.Entry<Integer, Integer>> sortedEntries = new ArrayList<>(commentPositions.entrySet());
+        sortedEntries.sort((a, b) -> Integer.compare(b.getValue(), a.getValue()));
 
-        for (int annotationId : sortedIds) {
-            int bodyIndex = commentPositions.get(annotationId);
+        for (var entry : sortedEntries) {
+            int annotationId = entry.getKey();
+            int bodyIndex = entry.getValue();
             try {
                 processAnnotation(doc, annotationId, bodyIndex, submissionJson, flowChartImage, metadata);
             } catch (Exception e) {
