@@ -16,6 +16,37 @@
         <result column="onlyoffice_doc_key" property="onlyofficeDocKey"/>
         <result column="generate_time" property="generateTime"/>
         <result column="submit_time" property="submitTime"/>
+        <result column="report_html" property="reportHtml"/>
+        <result column="template_id" property="templateId"/>
+        <result column="submission_id" property="submissionId"/>
+        <result column="flow_chart_path" property="flowChartPath"/>
+        <result column="review_comment" property="reviewComment"/>
+        <result column="reviewer_id" property="reviewerId"/>
+        <result column="create_by" property="createBy"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_by" property="updateBy"/>
+        <result column="update_time" property="updateTime"/>
+        <result column="deleted" property="deleted"/>
+        <result column="enterprise_name" property="enterpriseName"/>
+    </resultMap>
+
+    <!-- Light result map without report_html (which can be very large) -->
+    <resultMap id="LightResultMap" type="com.energy.audit.model.entity.report.ArReport">
+        <id column="id" property="id"/>
+        <result column="enterprise_id" property="enterpriseId"/>
+        <result column="audit_year" property="auditYear"/>
+        <result column="report_name" property="reportName"/>
+        <result column="report_type" property="reportType"/>
+        <result column="status" property="status"/>
+        <result column="generated_file_path" property="generatedFilePath"/>
+        <result column="uploaded_file_path" property="uploadedFilePath"/>
+        <result column="generate_time" property="generateTime"/>
+        <result column="submit_time" property="submitTime"/>
+        <result column="template_id" property="templateId"/>
+        <result column="submission_id" property="submissionId"/>
+        <result column="flow_chart_path" property="flowChartPath"/>
+        <result column="review_comment" property="reviewComment"/>
+        <result column="reviewer_id" property="reviewerId"/>
         <result column="create_by" property="createBy"/>
         <result column="create_time" property="createTime"/>
         <result column="update_by" property="updateBy"/>
@@ -27,9 +58,11 @@
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO ar_report (enterprise_id, audit_year, report_name, report_type,
                                status, generated_file_path, generate_time,
+                               report_html, template_id, submission_id, flow_chart_path,
                                create_by, update_by)
         VALUES (#{enterpriseId}, #{auditYear}, #{reportName}, #{reportType},
                 #{status}, #{generatedFilePath}, #{generateTime},
+                #{reportHtml}, #{templateId}, #{submissionId}, #{flowChartPath},
                 #{createBy}, #{updateBy})
     </insert>
 
@@ -42,6 +75,12 @@
             <if test="uploadedFilePath != null">uploaded_file_path = #{uploadedFilePath},</if>
             <if test="generateTime != null">generate_time = #{generateTime},</if>
             <if test="submitTime != null">submit_time = #{submitTime},</if>
+            <if test="reportHtml != null">report_html = #{reportHtml},</if>
+            <if test="templateId != null">template_id = #{templateId},</if>
+            <if test="submissionId != null">submission_id = #{submissionId},</if>
+            <if test="flowChartPath != null">flow_chart_path = #{flowChartPath},</if>
+            <if test="reviewComment != null">review_comment = #{reviewComment},</if>
+            <if test="reviewerId != null">reviewer_id = #{reviewerId},</if>
             update_by = #{updateBy},
             update_time = CURRENT_TIMESTAMP,
         </set>

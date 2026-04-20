@@ -1,8 +1,12 @@
 package com.energy.audit.service.report.impl;
 
+import com.energy.audit.common.exception.BusinessException;
 import com.energy.audit.dao.mapper.report.ArReportMapper;
+import com.energy.audit.dao.mapper.report.ArReportTemplateMapper;
 import com.energy.audit.model.entity.report.ArReport;
+import com.energy.audit.model.entity.report.ArReportTemplate;
 import com.energy.audit.service.report.ReportService;
+import com.energy.audit.service.report.TemplateBasedReportBuilder;
 import com.energy.audit.service.report.WordReportBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,7 +16,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -29,6 +35,9 @@ public class ReportServiceImpl implements ReportService {
 
     @Autowired
     private ArReportMapper reportMapper;
+
+    @Autowired(required = false)
+    private ArReportTemplateMapper reportTemplateMapper;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -227,5 +236,188 @@ public class ReportServiceImpl implements ReportService {
         }
 
         return data;
+    }
+
+    // ====== Template-based report generation (Phase 1) ======
+
+    @Override
+    @Transactional
+    public ArReport generateReportFromTemplate(Long submissionId, byte[] flowChartImage, String username) {
+        // 1. Load submission and verify status = 2 (approved)
+        Map<String, Object> submission;
+        try {
+            submission = jdbcTemplate.queryForMap(
+                "SELECT s.id, s.enterprise_id, s.audit_year, s.submission_json, s.status, " +
+                "e.enterprise_name, e.credit_code " +
+                "FROM tpl_submission s " +
+                "LEFT JOIN ent_enterprise e ON e.id = s.enterprise_id " +
+                "WHERE s.id = ? AND s.deleted = 0", submissionId);
+        } catch (Exception e) {
+            throw new BusinessException("填报记录不存在: submissionId=" + submissionId);
+        }
+
+        Integer submissionStatus = ((Number) submission.get("status")).intValue();
+        if (submissionStatus != 2) {
+            throw new BusinessException("填报必须通过审核后才能生成报告（当前状态: " + submissionStatus + "）");
+        }
+
+        Long enterpriseId = ((Number) submission.get("enterprise_id")).longValue();
+        Integer auditYear = ((Number) submission.get("audit_year")).intValue();
+        String submissionJson = (String) submission.get("submission_json");
+        String enterpriseName = (String) submission.getOrDefault("enterprise_name", "企业");
+        String creditCode = (String) submission.getOrDefault("credit_code", "");
+
+        if (submissionJson == null || submissionJson.isEmpty()) {
+            throw new BusinessException("填报数据为空，无法生成报告");
+        }
+
+        // 2. Load active report template
+        if (reportTemplateMapper == null) {
+            throw new BusinessException("报告模板模块未初始化");
+        }
+        ArReportTemplate template = reportTemplateMapper.selectActive();
+        if (template == null) {
+            throw new BusinessException("未找到可用的报告模板，请联系管理员上传模板");
+        }
+        String templatePath = template.getTemplateFilePath();
+        if (templatePath == null || !Files.exists(Paths.get(templatePath))) {
+            throw new BusinessException("报告模板文件不存在: " + templatePath);
+        }
+
+        // 3. Check for existing report (overwrite strategy)
+        ArReport record = reportMapper.selectByEnterpriseAndYear(enterpriseId, auditYear, 2);
+        if (record != null && record.getStatus() == 1) {
+            if (record.getUpdateTime() != null &&
+                record.getUpdateTime().plusMinutes(STUCK_TIMEOUT_MINUTES).isBefore(LocalDateTime.now())) {
+                record.setStatus(3);
+                record.setUpdateBy(username);
+                reportMapper.update(record);
+            } else {
+                throw new BusinessException("报告正在生成中，请稍候");
+            }
+        }
+
+        if (record == null) {
+            record = new ArReport();
+            record.setEnterpriseId(enterpriseId);
+            record.setAuditYear(auditYear);
+            record.setReportType(2); // type 2 = template-based
+            record.setStatus(1); // generating
+            record.setTemplateId(template.getId());
+            record.setSubmissionId(submissionId);
+            record.setCreateBy(username);
+            record.setUpdateBy(username);
+            reportMapper.insert(record);
+        } else {
+            record.setStatus(1);
+            record.setTemplateId(template.getId());
+            record.setSubmissionId(submissionId);
+            record.setUpdateBy(username);
+            reportMapper.update(record);
+        }
+
+        try {
+            // 4. Build metadata
+            Map<String, String> metadata = new HashMap<>();
+            metadata.put("year", String.valueOf(auditYear));
+            metadata.put("enterpriseCode", creditCode);
+            metadata.put("enterpriseName", enterpriseName);
+
+            // 5. Generate report from template
+            byte[] docxBytes;
+            try (InputStream templateIs = new FileInputStream(templatePath)) {
+                docxBytes = TemplateBasedReportBuilder.buildReport(
+                    templateIs, submissionJson, flowChartImage, metadata);
+            }
+
+            // 6. Save .docx file
+            Path dirPath = Paths.get(uploadDir).toAbsolutePath().normalize();
+            Files.createDirectories(dirPath);
+            String fileName = "report_template_" + enterpriseId + "_" + auditYear + "_" +
+                System.currentTimeMillis() + ".docx";
+            Path filePath = dirPath.resolve(fileName).normalize();
+            Files.write(filePath, docxBytes);
+
+            // 7. Convert to HTML for TinyMCE editing
+            String reportHtml = TemplateBasedReportBuilder.convertDocxToHtml(docxBytes);
+
+            // 8. Save flow chart image if provided
+            String flowChartFilePath = null;
+            if (flowChartImage != null && flowChartImage.length > 0) {
+                String imgFileName = "flow_chart_" + enterpriseId + "_" + auditYear + "_" +
+                    System.currentTimeMillis() + ".png";
+                Path imgPath = dirPath.resolve(imgFileName).normalize();
+                Files.write(imgPath, flowChartImage);
+                flowChartFilePath = imgPath.toString();
+            }
+
+            // 9. Update report record
+            String reportName = enterpriseName + " " + auditYear + "年度能源审计报告";
+            record.setStatus(2); // generated
+            record.setReportName(reportName);
+            record.setGeneratedFilePath(filePath.toString());
+            record.setReportHtml(reportHtml);
+            record.setFlowChartPath(flowChartFilePath);
+            record.setGenerateTime(LocalDateTime.now());
+            record.setUpdateBy(username);
+            reportMapper.update(record);
+
+            log.info("[ReportService] Template-based report generated: enterprise={} year={} file={}",
+                enterpriseId, auditYear, filePath);
+            return reportMapper.selectById(record.getId());
+
+        } catch (BusinessException be) {
+            throw be;
+        } catch (Exception e) {
+            log.error("Template-based report generation failed for submission={}", submissionId, e);
+            record.setStatus(3); // failed
+            record.setUpdateBy(username);
+            reportMapper.update(record);
+            throw new BusinessException("报告生成失败: " + e.getMessage());
+        }
+    }
+
+    @Override
+    @Transactional
+    public ArReport saveReportHtml(Long reportId, String html, String username) {
+        ArReport report = reportMapper.selectById(reportId);
+        if (report == null) {
+            throw new BusinessException("报告不存在");
+        }
+        if (report.getStatus() != null && report.getStatus() == 5) {
+            throw new BusinessException("报告已审核通过，不可编辑");
+        }
+        report.setReportHtml(html);
+        report.setUpdateBy(username);
+        reportMapper.update(report);
+        return reportMapper.selectById(reportId);
+    }
+
+    @Override
+    @Transactional
+    public ArReport submitForReview(Long reportId, String username) {
+        ArReport report = reportMapper.selectById(reportId);
+        if (report == null) {
+            throw new BusinessException("报告不存在");
+        }
+        if (report.getStatus() == null || report.getStatus() < 2) {
+            throw new BusinessException("报告尚未生成，不可提交审核");
+        }
+        if (report.getStatus() == 5) {
+            throw new BusinessException("报告已审核通过，无需重复提交");
+        }
+        report.setStatus(4); // submitted_for_review
+        report.setSubmitTime(LocalDateTime.now());
+        report.setUpdateBy(username);
+        reportMapper.update(report);
+        return reportMapper.selectById(reportId);
+    }
+
+    @Override
+    public List<ArReportTemplate> listTemplates() {
+        if (reportTemplateMapper == null) {
+            return List.of();
+        }
+        return reportTemplateMapper.selectAll();
     }
 }

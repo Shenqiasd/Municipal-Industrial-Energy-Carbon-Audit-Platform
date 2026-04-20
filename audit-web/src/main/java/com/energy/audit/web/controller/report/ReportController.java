@@ -4,6 +4,7 @@ import com.energy.audit.common.exception.BusinessException;
 import com.energy.audit.common.result.R;
 import com.energy.audit.common.util.SecurityUtils;
 import com.energy.audit.model.entity.report.ArReport;
+import com.energy.audit.model.entity.report.ArReportTemplate;
 import com.energy.audit.service.report.ReportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -12,10 +13,12 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 
 @Tag(name = "Report", description = "Audit report management")
 @RestController
@@ -32,7 +35,7 @@ public class ReportController {
         }
     }
 
-    @Operation(summary = "Generate audit report")
+    @Operation(summary = "Generate audit report (legacy code-based)")
     @PostMapping("/generate")
     public R<ArReport> generate(@RequestParam Integer auditYear) {
         requireEnterprise();
@@ -80,5 +83,64 @@ public class ReportController {
                 "attachment; filename*=UTF-8''" + encodedFileName)
             .contentType(MediaType.APPLICATION_OCTET_STREAM)
             .body(content);
+    }
+
+    // ====== Template-based report generation (Phase 1) ======
+
+    @Operation(summary = "Generate report from Word template using SpreadJS submission data")
+    @PostMapping("/generate-from-template")
+    public R<ArReport> generateFromTemplate(
+            @RequestParam Long submissionId,
+            @RequestPart(required = false) MultipartFile flowChartImage) {
+        requireEnterprise();
+        String username = SecurityUtils.getCurrentUsername();
+        byte[] imageBytes = null;
+        if (flowChartImage != null && !flowChartImage.isEmpty()) {
+            try {
+                imageBytes = flowChartImage.getBytes();
+            } catch (Exception e) {
+                return R.fail("能源流向图上传失败");
+            }
+        }
+        ArReport report = reportService.generateReportFromTemplate(submissionId, imageBytes, username);
+        return R.ok(report);
+    }
+
+    @Operation(summary = "Save edited report HTML (from TinyMCE editor)")
+    @PostMapping("/{id}/edit")
+    public R<ArReport> editHtml(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        requireEnterprise();
+        Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
+        ArReport report = reportService.getReport(id);
+        if (report == null || !report.getEnterpriseId().equals(enterpriseId)) {
+            return R.fail("报告不存在");
+        }
+        String html = body.get("html");
+        if (html == null) {
+            return R.fail("缺少 html 字段");
+        }
+        String username = SecurityUtils.getCurrentUsername();
+        ArReport updated = reportService.saveReportHtml(id, html, username);
+        return R.ok(updated);
+    }
+
+    @Operation(summary = "Submit report for auditor review")
+    @PostMapping("/{id}/submit-for-review")
+    public R<ArReport> submitForReview(@PathVariable Long id) {
+        requireEnterprise();
+        Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
+        ArReport report = reportService.getReport(id);
+        if (report == null || !report.getEnterpriseId().equals(enterpriseId)) {
+            return R.fail("报告不存在");
+        }
+        String username = SecurityUtils.getCurrentUsername();
+        ArReport updated = reportService.submitForReview(id, username);
+        return R.ok(updated);
+    }
+
+    @Operation(summary = "List available report templates")
+    @GetMapping("/templates")
+    public R<List<ArReportTemplate>> listTemplates() {
+        return R.ok(reportService.listTemplates());
     }
 }
