@@ -259,6 +259,20 @@ function applyConfigPrefill(
   }
 }
 
+/** Column definition type for CONFIG_PREFILL mappings */
+interface ConfigPrefillColDef {
+  col: string | number
+  field: string
+  format?: string
+  dropdown?: boolean
+  prefill?: boolean
+  /** When set, this column's value is auto-derived from the record matching the master column.
+   *  The column is locked and auto-updates when the master column value changes.
+   *  Example: { "masterCol": "A", "lookupField": "name" } */
+  linkedTo?: { masterCol: string; lookupField: string }
+  extraSources?: Array<{ table: string; field: string; filter?: Record<string, unknown> }>
+}
+
 function applyOneConfigPrefill(
   wb: import('@/types/spreadjs').GCSpreadWorkbook,
   tag: TplTagMapping,
@@ -275,7 +289,7 @@ function applyOneConfigPrefill(
   let config: {
     filter?: Record<string, unknown>
     mode?: 'prefill' | 'dropdown_only'
-    columns: Array<{ col: string | number; field: string; format?: string; dropdown?: boolean; prefill?: boolean; extraSources?: Array<{ table: string; field: string; filter?: Record<string, unknown> }> }>
+    columns: ConfigPrefillColDef[]
   }
   try {
     config = JSON.parse(tag.columnMappings)
@@ -348,8 +362,8 @@ function applyOneConfigPrefill(
   // 8. Build per-column deduplicated dropdown value lists from ALL filtered records
   const colDropdownValues = new Map<number, string[]>()
   for (const colDef of columns) {
-    // Skip dropdown for columns explicitly marked dropdown: false
-    if (colDef.dropdown === false) continue
+    // Skip dropdown for columns explicitly marked dropdown: false OR linkedTo columns
+    if (colDef.dropdown === false || colDef.linkedTo) continue
     const colIndex = resolveColIndex(colDef)
     const values: string[] = []
     const seen = new Set<string>()
@@ -402,8 +416,18 @@ function applyOneConfigPrefill(
         }
       }
 
-      // Set dropdown validator (skip if dropdown: false)
-      if (DataValidation && colDef.dropdown !== false) {
+      // Lock linkedTo columns — value is derived, user should not edit directly
+      if (colDef.linkedTo) {
+        try {
+          const style = sheet.getStyle(startRow + i, colIndex) || new (window.GC.Spread.Sheets.Style)()
+          style.locked = true
+          style.backColor = '#F5F5F5' // light gray to indicate read-only
+          sheet.setStyle(startRow + i, colIndex, style)
+        } catch { /* ignore styling errors */ }
+      }
+
+      // Set dropdown validator (skip if dropdown: false or linkedTo)
+      if (DataValidation && colDef.dropdown !== false && !colDef.linkedTo) {
         const dropdownVals = colDropdownValues.get(colIndex)
         if (dropdownVals?.length) {
           try {
@@ -432,9 +456,48 @@ function applyOneConfigPrefill(
     }
   }
 
+  // 11. Bind CellChanged event for linkedTo columns — auto-fill dependent columns when master changes
+  const linkedCols = columns.filter(c => c.linkedTo)
+  if (linkedCols.length > 0 && !isDropdownOnly) {
+    const Events = window.GC?.Spread?.Sheets?.Events
+    if (Events?.CellChanged) {
+      sheet.bind(Events.CellChanged, (_sender: unknown, args: { row: number; col: number; newValue: unknown }) => {
+        const { row, col: changedCol, newValue } = args
+        // Only process changes within our data range
+        if (row < startRow || row >= startRow + rowsToFill) return
+
+        for (const linked of linkedCols) {
+          const masterColIndex = resolveColIndex({ col: linked.linkedTo!.masterCol })
+          if (changedCol !== masterColIndex) continue
+
+          // Look up the record matching the new master value
+          const lookupField = linked.linkedTo!.lookupField
+          const newValStr = newValue != null ? String(newValue) : ''
+          const matchedRecord = records.find(r => String(r[lookupField] ?? '') === newValStr)
+
+          // Auto-fill the linked column with the matched record's field value
+          const linkedColIndex = resolveColIndex(linked)
+          if (matchedRecord) {
+            let fillVal: unknown
+            if (linked.format) {
+              fillVal = linked.format.replace(/\{(\w+)\}/g, (_, key: string) => String(matchedRecord[key] ?? ''))
+            } else {
+              fillVal = matchedRecord[linked.field]
+            }
+            sheet.setValue(row, linkedColIndex, fillVal != null ? fillVal : '')
+          } else {
+            sheet.setValue(row, linkedColIndex, '')
+          }
+        }
+      })
+      console.log(`[config-prefill] "${tag.tagName}": bound CellChanged for ${linkedCols.length} linkedTo column(s)`)
+    }
+  }
+
   console.log(
     `[config-prefill] "${tag.tagName}" [${isDropdownOnly ? 'dropdown_only' : 'prefill'}]: ` +
-    `${rowsToFill} rows processed` + (isDropdownOnly ? '' : `, ${maxRows - rowsToFill} empty rows hidden`),
+    `${rowsToFill} rows processed` + (isDropdownOnly ? '' : `, ${maxRows - rowsToFill} empty rows hidden`) +
+    (linkedCols.length > 0 ? `, ${linkedCols.length} linked column(s)` : ''),
   )
 }
 
