@@ -244,7 +244,6 @@ public class ReportServiceImpl implements ReportService {
     // ====== Template-based report generation (Phase 1) ======
 
     @Override
-    @Transactional
     public ArReport generateReportFromTemplate(Long submissionId, Long callerEnterpriseId, byte[] flowChartImage, String username) {
         // 1. Load submission and verify status = 2 (approved)
         Map<String, Object> submission;
@@ -292,53 +291,61 @@ public class ReportServiceImpl implements ReportService {
             throw new BusinessException("报告模板文件不存在: " + templatePath);
         }
 
-        // 3. Check for existing report (overwrite strategy)
-        ArReport record = reportMapper.selectByEnterpriseAndYear(enterpriseId, auditYear, 2);
-        if (record != null && record.getStatus() == 1) {
-            if (record.getUpdateTime() != null &&
-                record.getUpdateTime().plusMinutes(STUCK_TIMEOUT_MINUTES).isBefore(LocalDateTime.now())) {
-                record.setStatus(3);
-                record.setUpdateBy(username);
-                reportMapper.update(record);
-            } else {
-                throw new BusinessException("报告正在生成中，请稍候");
-            }
+        // 3. Create/update report record and COMMIT in a short transaction.
+        //    This releases the row lock so that markReportFailed (REQUIRES_NEW)
+        //    won't deadlock if the generation phase fails.
+        final Long reportId;
+        {
+            TransactionTemplate initTx = new TransactionTemplate(transactionManager);
+            reportId = initTx.execute(status -> {
+                ArReport record = reportMapper.selectByEnterpriseAndYear(enterpriseId, auditYear, 2);
+                if (record != null && record.getStatus() == 1) {
+                    if (record.getUpdateTime() != null &&
+                        record.getUpdateTime().plusMinutes(STUCK_TIMEOUT_MINUTES).isBefore(LocalDateTime.now())) {
+                        record.setStatus(3);
+                        record.setUpdateBy(username);
+                        reportMapper.update(record);
+                    } else {
+                        throw new BusinessException("报告正在生成中，请稍候");
+                    }
+                }
+
+                if (record == null) {
+                    record = new ArReport();
+                    record.setEnterpriseId(enterpriseId);
+                    record.setAuditYear(auditYear);
+                    record.setReportType(2); // type 2 = template-based
+                    record.setStatus(1); // generating
+                    record.setTemplateId(template.getId());
+                    record.setSubmissionId(submissionId);
+                    record.setCreateBy(username);
+                    record.setUpdateBy(username);
+                    reportMapper.insert(record);
+                } else {
+                    record.setStatus(1);
+                    record.setTemplateId(template.getId());
+                    record.setSubmissionId(submissionId);
+                    record.setUpdateBy(username);
+                    reportMapper.update(record);
+                }
+                return record.getId();
+            });
         }
 
-        if (record == null) {
-            record = new ArReport();
-            record.setEnterpriseId(enterpriseId);
-            record.setAuditYear(auditYear);
-            record.setReportType(2); // type 2 = template-based
-            record.setStatus(1); // generating
-            record.setTemplateId(template.getId());
-            record.setSubmissionId(submissionId);
-            record.setCreateBy(username);
-            record.setUpdateBy(username);
-            reportMapper.insert(record);
-        } else {
-            record.setStatus(1);
-            record.setTemplateId(template.getId());
-            record.setSubmissionId(submissionId);
-            record.setUpdateBy(username);
-            reportMapper.update(record);
-        }
-
+        // 4. Heavy generation work runs OUTSIDE any transaction.
+        //    Row lock from step 3 is already released.
         try {
-            // 4. Build metadata
             Map<String, String> metadata = new HashMap<>();
             metadata.put("year", String.valueOf(auditYear));
             metadata.put("enterpriseCode", creditCode);
             metadata.put("enterpriseName", enterpriseName);
 
-            // 5. Generate report from template
             byte[] docxBytes;
             try (InputStream templateIs = new FileInputStream(templatePath)) {
                 docxBytes = TemplateBasedReportBuilder.buildReport(
                     templateIs, submissionJson, flowChartImage, metadata);
             }
 
-            // 6. Save .docx file
             Path dirPath = Paths.get(uploadDir).toAbsolutePath().normalize();
             Files.createDirectories(dirPath);
             String fileName = "report_template_" + enterpriseId + "_" + auditYear + "_" +
@@ -346,10 +353,8 @@ public class ReportServiceImpl implements ReportService {
             Path filePath = dirPath.resolve(fileName).normalize();
             Files.write(filePath, docxBytes);
 
-            // 7. Convert to HTML for TinyMCE editing
             String reportHtml = TemplateBasedReportBuilder.convertDocxToHtml(docxBytes);
 
-            // 8. Save flow chart image if provided
             String flowChartFilePath = null;
             if (flowChartImage != null && flowChartImage.length > 0) {
                 String imgFileName = "flow_chart_" + enterpriseId + "_" + auditYear + "_" +
@@ -359,26 +364,32 @@ public class ReportServiceImpl implements ReportService {
                 flowChartFilePath = imgPath.toString();
             }
 
-            // 9. Update report record
-            String reportName = enterpriseName + " " + auditYear + "年度能源审计报告";
-            record.setStatus(2); // generated
-            record.setReportName(reportName);
-            record.setGeneratedFilePath(filePath.toString());
-            record.setReportHtml(reportHtml);
-            record.setFlowChartPath(flowChartFilePath);
-            record.setGenerateTime(LocalDateTime.now());
-            record.setUpdateBy(username);
-            reportMapper.update(record);
+            // 5. Commit success in a short transaction
+            final String finalFlowChartPath = flowChartFilePath;
+            TransactionTemplate successTx = new TransactionTemplate(transactionManager);
+            successTx.executeWithoutResult(status -> {
+                String reportName = enterpriseName + " " + auditYear + "年度能源审计报告";
+                ArReport record = reportMapper.selectById(reportId);
+                record.setStatus(2); // generated
+                record.setReportName(reportName);
+                record.setGeneratedFilePath(filePath.toString());
+                record.setReportHtml(reportHtml);
+                record.setFlowChartPath(finalFlowChartPath);
+                record.setGenerateTime(LocalDateTime.now());
+                record.setUpdateBy(username);
+                reportMapper.update(record);
+            });
 
             log.info("[ReportService] Template-based report generated: enterprise={} year={} file={}",
                 enterpriseId, auditYear, filePath);
-            return reportMapper.selectById(record.getId());
+            return reportMapper.selectById(reportId);
 
         } catch (BusinessException be) {
             throw be;
         } catch (Exception e) {
             log.error("Template-based report generation failed for submission={}", submissionId, e);
-            markReportFailed(record.getId(), username);
+            // No deadlock: the status=1 row is already committed, no outer tx holds the lock
+            markReportFailed(reportId, username);
             throw new BusinessException("报告生成失败: " + e.getMessage());
         }
     }
@@ -424,24 +435,20 @@ public class ReportServiceImpl implements ReportService {
      * even when the outer @Transactional rolls back.
      * Uses TransactionTemplate with REQUIRES_NEW to avoid Spring AOP self-invocation trap.
      */
+    /**
+     * Mark a report as failed.
+     * Called after the status=1 init transaction has already committed,
+     * so the row is visible and no outer transaction holds a lock.
+     */
     private void markReportFailed(Long reportId, String username) {
         try {
             TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);
-            txTemplate.setPropagationBehavior(
-                org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
             txTemplate.executeWithoutResult(status -> {
-                // Use direct SQL to avoid visibility issues with REQUIRES_NEW:
-                // The outer transaction's uncommitted INSERT may not be visible
-                // to this new transaction under READ_COMMITTED isolation.
-                // Using INSERT ... ON DUPLICATE KEY UPDATE ensures the record
-                // is created or updated regardless.
                 int updated = jdbcTemplate.update(
                     "UPDATE ar_report SET status = 3, update_by = ?, update_time = NOW() " +
                     "WHERE id = ? AND deleted = 0", username, reportId);
                 if (updated == 0) {
-                    log.warn("[ReportService] markReportFailed: no record found for id={}, " +
-                        "likely uncommitted INSERT from outer transaction — status=3 will not be persisted",
-                        reportId);
+                    log.warn("[ReportService] markReportFailed: no record found for id={}", reportId);
                 }
             });
         } catch (Exception ex) {

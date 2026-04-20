@@ -10,6 +10,7 @@ import java.awt.image.BufferedImage;
 import java.io.*;
 import java.math.BigInteger;
 import java.util.*;
+import java.util.Base64;
 
 /**
  * Template-based report builder that reads a Word (.docx) template with batch annotations (批注),
@@ -499,8 +500,26 @@ public class TemplateBasedReportBuilder {
 
     private static void convertParagraphToHtml(XWPFParagraph para, StringBuilder html) {
         String text = para.getText().trim();
-        if (text.isEmpty()) {
+
+        // Check if paragraph contains embedded images
+        boolean hasImages = false;
+        for (XWPFRun run : para.getRuns()) {
+            if (!run.getEmbeddedPictures().isEmpty()) {
+                hasImages = true;
+                break;
+            }
+        }
+
+        if (text.isEmpty() && !hasImages) {
             html.append("<p>&nbsp;</p>\n");
+            return;
+        }
+
+        // If paragraph only contains images, emit them directly
+        if (text.isEmpty() && hasImages) {
+            html.append("<p class='center'>");
+            emitRunImages(para, html);
+            html.append("</p>\n");
             return;
         }
 
@@ -523,10 +542,16 @@ public class TemplateBasedReportBuilder {
         } else if (isBold && maxFontSize >= 11) {
             html.append("<h3>").append(escapeHtml(text)).append("</h3>\n");
         } else if (isCenter) {
-            html.append("<p class='center'>").append(escapeHtml(text)).append("</p>\n");
+            html.append("<p class='center'>").append(escapeHtml(text));
+            if (hasImages) emitRunImages(para, html);
+            html.append("</p>\n");
         } else {
             html.append("<p>");
             for (XWPFRun run : para.getRuns()) {
+                // Emit embedded images from this run
+                for (XWPFPicture pic : run.getEmbeddedPictures()) {
+                    emitPictureAsBase64(pic, html);
+                }
                 String runText = run.getText(0);
                 if (runText == null) continue;
                 if (run.isBold()) html.append("<strong>");
@@ -534,6 +559,35 @@ public class TemplateBasedReportBuilder {
                 if (run.isBold()) html.append("</strong>");
             }
             html.append("</p>\n");
+        }
+    }
+
+    private static void emitRunImages(XWPFParagraph para, StringBuilder html) {
+        for (XWPFRun run : para.getRuns()) {
+            for (XWPFPicture pic : run.getEmbeddedPictures()) {
+                emitPictureAsBase64(pic, html);
+            }
+        }
+    }
+
+    private static void emitPictureAsBase64(XWPFPicture pic, StringBuilder html) {
+        try {
+            XWPFPictureData picData = pic.getPictureData();
+            if (picData == null) return;
+            byte[] data = picData.getData();
+            String mimeType;
+            switch (picData.getPictureType()) {
+                case XWPFDocument.PICTURE_TYPE_PNG -> mimeType = "image/png";
+                case XWPFDocument.PICTURE_TYPE_JPEG -> mimeType = "image/jpeg";
+                case XWPFDocument.PICTURE_TYPE_GIF -> mimeType = "image/gif";
+                default -> mimeType = "image/png";
+            }
+            String base64 = Base64.getEncoder().encodeToString(data);
+            html.append("<img src='data:").append(mimeType)
+                .append(";base64,").append(base64).append("' ")
+                .append("alt='embedded-image' style='max-width:100%;height:auto;'/>");
+        } catch (Exception e) {
+            log.warn("[ReportBuilder] Failed to convert embedded image to base64: {}", e.getMessage());
         }
     }
 
