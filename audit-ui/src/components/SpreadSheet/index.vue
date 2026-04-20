@@ -365,7 +365,7 @@ function applyOneConfigPrefill(
   const colDropdownValues = new Map<number, string[]>()
   for (const colDef of columns) {
     // Skip dropdown for columns explicitly marked dropdown: false OR linkedTo columns
-    if (colDef.dropdown === false || colDef.linkedTo) continue
+    if (colDef.dropdown === false || colDef.linkedTo || colDef.locked) continue
     const colIndex = resolveColIndex(colDef)
     const values: string[] = []
     const seen = new Set<string>()
@@ -471,7 +471,7 @@ function applyOneConfigPrefill(
   // 11. Identify master columns that have linkedTo dependents (for event binding)
   const linkedCols = columns.filter(c => c.linkedTo)
   // Identify master columns with dropdowns (for duplicate prevention)
-  const masterColDefs = columns.filter(c => !c.linkedTo && c.dropdown !== false && colDropdownValues.has(resolveColIndex(c)))
+  const masterColDefs = columns.filter(c => !c.linkedTo && !c.locked && c.dropdown !== false && colDropdownValues.has(resolveColIndex(c)))
 
   // Helper: rebuild per-row dropdowns excluding values already used in other rows
   const refreshDropdownsExcludingDuplicates = () => {
