@@ -1092,7 +1092,7 @@ function buildCellTagIndex(wb: import('@/types/spreadjs').GCSpreadWorkbook): voi
     for (let r = 0; r < rowCount; r++) {
       for (let c = 0; c < colCount; c++) {
         const tag = sheet.getTag(r, c)
-        if (tag && typeof tag === 'string') {
+        if (tag && typeof tag === 'string' && !sheetMap.has(tag)) {
           sheetMap.set(tag, { row: r, col: c })
         }
       }
