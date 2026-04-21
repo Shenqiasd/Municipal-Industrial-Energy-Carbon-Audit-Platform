@@ -103,9 +103,11 @@ jobs:
           set -e
           shopt -s nullglob
           # Apply 00-schema.sql first (baseline) then all numbered migrations
-          # in lexical order, which matches the numeric prefix convention.
+          # in lexical order. The [0-9]* glob excludes sql/schema.sql, which
+          # would otherwise sort last ('s' > '2') and its DROP TABLE statements
+          # would undo every incremental migration applied before it.
           failed=0
-          for f in $(ls sql/*.sql | sort); do
+          for f in $(ls sql/[0-9]*.sql | sort); do
             echo "::group::Applying $f"
             if mysql -h 127.0.0.1 -P 3306 -uroot audit_test < "$f"; then
               echo "OK: $f"
