@@ -56,6 +56,34 @@ let currentSubmission: TplSubmission | null = null
  */
 let ownsLock = false
 
+// ── Safe wrappers for optional SpreadJS Workbook APIs ───────────────────
+// Some SpreadJS builds / license tiers expose `suspendEvent`, `suspendCalcService`
+// and `calculate` while others do not. Wrap each call in a feature-detect so
+// that the main init path never fails if an API is missing.
+type WB = import('@/types/spreadjs').GCSpreadWorkbook
+function suspendEventSafe(wb: WB) {
+  try { (wb as unknown as { suspendEvent?: () => void }).suspendEvent?.() } catch { /* best-effort */ }
+}
+function resumeEventSafe(wb: WB) {
+  try { (wb as unknown as { resumeEvent?: () => void }).resumeEvent?.() } catch { /* best-effort */ }
+}
+function suspendCalcServiceSafe(wb: WB) {
+  try { (wb as unknown as { suspendCalcService?: () => void }).suspendCalcService?.() } catch { /* best-effort */ }
+}
+function resumeCalcServiceSafe(wb: WB) {
+  try { (wb as unknown as { resumeCalcService?: () => void }).resumeCalcService?.() } catch { /* best-effort */ }
+}
+function calculateAllSafe(wb: WB) {
+  try {
+    const sheets = (window.GC?.Spread?.Sheets ?? {}) as unknown as {
+      CalculationType?: { all?: unknown }
+    }
+    const calcType = sheets.CalculationType?.all
+    const fn = (wb as unknown as { calculate?: (t?: unknown) => void }).calculate
+    if (typeof fn === 'function') fn.call(wb, calcType)
+  } catch { /* best-effort */ }
+}
+
 watch(
   () => props.readonly,
   (isNowReadonly) => {
@@ -110,55 +138,112 @@ async function initWorkbook() {
     }
 
     const jsonStr = currentSubmission?.submissionJson ?? publishedVersion.templateJson
-    workbook.fromJSON(JSON.parse(jsonStr))
+    // Skip recalculation during fromJSON — a single recalc is triggered
+    // after all Phase 2 mutations complete, avoiding repeated full-workbook
+    // recomputation on templates with heavy cross-sheet formulas.
+    console.time('[perf] fromJSON')
+    ;(workbook.fromJSON as unknown as (data: unknown, opts?: Record<string, unknown>) => void)(
+      JSON.parse(jsonStr),
+      { doNotRecalculateAfterLoad: true },
+    )
+    console.timeEnd('[perf] fromJSON')
 
     // ── Phase 2: fetch tags + prefill data in parallel (one listTags call) ─
     // Wrapped in its own try-catch so that a failure in supplementary features
     // (prefill / dropdowns / protection) does NOT prevent the core spreadsheet
     // from rendering — matching the original best-effort error handling.
-    if (publishedVersion.id) {
-      try {
-        const [tags, prefillData, configPrefillData] = await Promise.all([
-          listTags(publishedVersion.id),
-          !currentSubmission
-            ? getEnterpriseSettingPrefill().catch(() => null)
-            : Promise.resolve(null),
-          // Always fetch config data — dropdowns need it even for existing submissions
-          getConfigPrefillData().catch(() => null),
-        ])
+    //
+    // NOTE: `fromJSON` was called with `doNotRecalculateAfterLoad: true`, so
+    // every path out of Phase 2 (happy / skip / throw) MUST eventually trigger
+    // a single `calculateAllSafe(workbook)` — otherwise formula cells render
+    // stale or empty. We use an outer try/finally for that guarantee.
+    try {
+      if (publishedVersion.id) {
+        try {
+          console.time('[perf] phase2-fetch')
+          const [tags, prefillData, configPrefillData] = await Promise.all([
+            listTags(publishedVersion.id).catch(e => {
+              console.warn('[phase2] listTags failed:', e)
+              return [] as TplTagMapping[]
+            }),
+            !currentSubmission
+              ? getEnterpriseSettingPrefill().catch(() => null)
+              : Promise.resolve(null),
+            // Always fetch config data — dropdowns need it even for existing submissions
+            getConfigPrefillData().catch(() => null),
+          ])
+          console.timeEnd('[perf] phase2-fetch')
 
-        // Build cell-tag index ONCE for O(1) lookups (replaces O(tags × rows × cols) scans)
-        // Must be called BEFORE applyPrefill/applyConfigPrefill/applyDataEntryProtection
-        // since they all use fillTaggedCell/unlockScalarCell which rely on the index.
-        buildCellTagIndex(workbook)
+          // Master suspend envelope for all Phase 2 mutations — prevents the
+          // ~1000 setValue/setStyle/setDataValidator calls below from each
+          // triggering a full-workbook repaint / event dispatch / recalc.
+          // Nested suspend calls inside individual apply* functions are still
+          // safe (SpreadJS reference-counts suspend depth).
+          console.time('[perf] phase2-mutate')
+          workbook.suspendPaint()
+          suspendEventSafe(workbook)
+          suspendCalcServiceSafe(workbook)
+          try {
+            // Build cell-tag index ONCE for O(1) lookups (replaces O(tags ×
+            // rows × cols) scans). Must be called BEFORE applyPrefill /
+            // applyConfigPrefill / applyDataEntryProtection since they all use
+            // fillTaggedCell / unlockScalarCell which rely on the index.
+            console.time('[perf] buildCellTagIndex')
+            buildCellTagIndex(workbook)
+            console.timeEnd('[perf] buildCellTagIndex')
 
-        // Pre-fill enterprise settings (uses pre-fetched tags + prefillData)
-        if (!currentSubmission && prefillData) {
-          applyPrefill(workbook, tags, prefillData)
+            // Pre-fill enterprise settings (uses pre-fetched tags + prefillData)
+            if (!currentSubmission && prefillData) {
+              console.time('[perf] applyPrefill')
+              applyPrefill(workbook, tags, prefillData)
+              console.timeEnd('[perf] applyPrefill')
+            }
+
+            // Config-driven prefill: always write values + dropdowns + hide empty rows
+            if (configPrefillData) {
+              console.time('[perf] applyConfigPrefill')
+              applyConfigPrefill(workbook, tags, configPrefillData)
+              console.timeEnd('[perf] applyConfigPrefill')
+            }
+
+            // Inject dictionary-based dropdown validators (uses pre-fetched tags)
+            console.time('[perf] applyDictValidators')
+            await applyDictValidators(workbook, tags)
+            console.timeEnd('[perf] applyDictValidators')
+
+            // Bind ValidationError event on every sheet
+            console.time('[perf] bindValidationErrorDialogs')
+            bindValidationErrorDialogs(workbook)
+            console.timeEnd('[perf] bindValidationErrorDialogs')
+
+            // Apply cell protection + required field markers (uses pre-fetched tags)
+            if (publishedVersion.protectionEnabled !== 0) {
+              console.time('[perf] applyDataEntryProtection')
+              applyDataEntryProtection(workbook, tags)
+              console.timeEnd('[perf] applyDataEntryProtection')
+            }
+          } finally {
+            resumeCalcServiceSafe(workbook)
+            resumeEventSafe(workbook)
+            workbook.resumePaint()
+            console.timeEnd('[perf] phase2-mutate')
+          }
+        } catch (e) {
+          console.warn('[phase2] failed to load tags / apply features:', e)
+          // Still bind validation error dialogs as fallback
+          bindValidationErrorDialogs(workbook)
         }
-
-        // Config-driven prefill: always write values + dropdowns + hide empty rows
-        if (configPrefillData) {
-          applyConfigPrefill(workbook, tags, configPrefillData)
-        }
-
-        // Inject dictionary-based dropdown validators (uses pre-fetched tags)
-        await applyDictValidators(workbook, tags)
-
-        // Bind ValidationError event on every sheet
-        bindValidationErrorDialogs(workbook)
-
-        // Apply cell protection + required field markers (uses pre-fetched tags)
-        if (publishedVersion.protectionEnabled !== 0) {
-          applyDataEntryProtection(workbook, tags)
-        }
-      } catch (e) {
-        console.warn('[phase2] failed to load tags / apply features:', e)
-        // Still bind validation error dialogs as fallback
+      } else {
         bindValidationErrorDialogs(workbook)
       }
-    } else {
-      bindValidationErrorDialogs(workbook)
+    } finally {
+      // Trigger a single recalculation now that all mutations are done (or
+      // skipped / failed) — this MUST run to compensate for the
+      // doNotRecalculateAfterLoad flag passed to fromJSON above. Otherwise
+      // formula cells would render stale/unevaluated.
+      console.time('[perf] calculate')
+      calculateAllSafe(workbook)
+      console.timeEnd('[perf] calculate')
     }
 
     // Force readonly when:
@@ -820,7 +905,19 @@ function applyDataEntryProtection(
     try {
       const sheetCount = wb.getSheetCount()
 
-      // Step 1: Lock all cells by default on every sheet
+      // Step 1: Lock all cells by default on every sheet. This forces `locked=true`
+      // on every cell including those whose template-level style has `locked=false`
+      // (e.g. cells authored in SpreadJS Designer / Excel with explicit unlock).
+      // Without this, Step 4's `isProtected=true` would leave those cells editable.
+      //
+      // NOTE: on templates with many large sheets this loop creates a Style object
+      // per cell and is itself a few seconds of work. The bigger perf win for
+      // template-open time comes from (a) avoiding the O(tags × rows × cols)
+      // getTag scans that used to live in unlockScalarCell/fillTaggedCell
+      // (addressed by the cell-tag index in a separate PR), and (b) the suspend
+      // envelope / single-recalc changes in this PR. We deliberately keep the
+      // original "brute-force lock-all" semantics here because `setDefaultStyle`
+      // alone does NOT override per-cell explicit `locked=false`.
       for (let si = 0; si < sheetCount; si++) {
         const sheet = wb.getSheet(si)
         const rows = sheet.getRowCount()
