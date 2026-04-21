@@ -75,7 +75,10 @@ function resumeCalcServiceSafe(wb: WB) {
 }
 function calculateAllSafe(wb: WB) {
   try {
-    const calcType = window.GC?.Spread?.Sheets?.CalculationType?.all
+    const sheets = (window.GC?.Spread?.Sheets ?? {}) as unknown as {
+      CalculationType?: { all?: unknown }
+    }
+    const calcType = sheets.CalculationType?.all
     const fn = (wb as unknown as { calculate?: (t?: unknown) => void }).calculate
     if (typeof fn === 'function') fn.call(wb, calcType)
   } catch { /* best-effort */ }
@@ -139,7 +142,10 @@ async function initWorkbook() {
     // after all Phase 2 mutations complete, avoiding repeated full-workbook
     // recomputation on templates with heavy cross-sheet formulas.
     console.time('[perf] fromJSON')
-    workbook.fromJSON(JSON.parse(jsonStr), { doNotRecalculateAfterLoad: true })
+    ;(workbook.fromJSON as unknown as (data: unknown, opts?: Record<string, unknown>) => void)(
+      JSON.parse(jsonStr),
+      { doNotRecalculateAfterLoad: true },
+    )
     console.timeEnd('[perf] fromJSON')
 
     // ── Phase 2: fetch tags + prefill data in parallel (one listTags call) ─
