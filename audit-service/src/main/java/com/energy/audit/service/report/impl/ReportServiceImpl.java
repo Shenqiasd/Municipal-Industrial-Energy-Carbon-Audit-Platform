@@ -17,6 +17,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -129,9 +130,9 @@ public class ReportServiceImpl implements ReportService {
         if (template == null) {
             throw new BusinessException("未找到可用的报告模板，请联系管理员上传模板");
         }
-        // Resolve template file: prefer DB BLOB (survives container restarts), fallback to filesystem
-        Path templatePath = resolveTemplateFile(template);
-        if (templatePath == null) {
+        // Resolve template InputStream: prefer filesystem (fast), fallback to DB BLOB (survives container restarts)
+        InputStream templateStream = resolveTemplateStream(template);
+        if (templateStream == null) {
             throw new BusinessException("报告模板文件不存在且数据库中无模板数据，请重新上传模板");
         }
 
@@ -185,7 +186,7 @@ public class ReportServiceImpl implements ReportService {
             metadata.put("enterpriseName", enterpriseName);
 
             byte[] docxBytes;
-            try (InputStream templateIs = new FileInputStream(templatePath.toFile())) {
+            try (InputStream templateIs = templateStream) {
                 docxBytes = TemplateBasedReportBuilder.buildReport(
                     templateIs, submissionJson, flowChartImage, metadata);
             }
@@ -437,34 +438,28 @@ public class ReportServiceImpl implements ReportService {
     }
 
     /**
-     * Resolve the template file path.  Priority:
+     * Resolve template as an InputStream.  Priority:
      * 1. Filesystem path (fast, if file still exists — e.g. same container that uploaded it)
-     * 2. DB BLOB → write to temp file (survives container restarts / redeployments)
+     * 2. DB BLOB as ByteArrayInputStream (no temp file, no disk leak)
      */
-    private Path resolveTemplateFile(ArReportTemplate template) {
+    private InputStream resolveTemplateStream(ArReportTemplate template) {
         // 1. Try filesystem first
         String fsPath = template.getTemplateFilePath();
         if (fsPath != null && Files.exists(Paths.get(fsPath))) {
-            return Paths.get(fsPath);
+            try {
+                log.info("[ReportService] Loading template from filesystem: {}", fsPath);
+                return new FileInputStream(fsPath);
+            } catch (IOException e) {
+                log.warn("[ReportService] Filesystem path exists but failed to open: {}", fsPath, e);
+                // Fall through to BLOB
+            }
         }
 
-        // 2. Fallback: restore from DB BLOB
+        // 2. Fallback: stream directly from DB BLOB (no temp file needed)
         byte[] data = template.getTemplateFileData();
         if (data != null && data.length > 0) {
-            try {
-                String suffix = ".docx";
-                String origName = template.getOriginalFileName();
-                if (origName != null && origName.toLowerCase().endsWith(".doc")) {
-                    suffix = ".doc";
-                }
-                Path tempFile = Files.createTempFile("report_template_", suffix);
-                Files.write(tempFile, data);
-                log.info("[ReportService] Restored template from DB BLOB to temp file: {}", tempFile);
-                return tempFile;
-            } catch (IOException e) {
-                log.error("Failed to write template BLOB to temp file", e);
-                return null;
-            }
+            log.info("[ReportService] Loading template from DB BLOB ({} bytes)", data.length);
+            return new ByteArrayInputStream(data);
         }
 
         log.warn("[ReportService] Template id={} has no file on disk and no BLOB in DB", template.getId());

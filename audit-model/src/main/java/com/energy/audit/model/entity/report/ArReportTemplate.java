@@ -1,6 +1,7 @@
 package com.energy.audit.model.entity.report;
 
 import com.energy.audit.model.entity.BaseEntity;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -19,6 +20,7 @@ public class ArReportTemplate extends BaseEntity {
     private String templateFilePath;
 
     /** Template file content stored as binary (survives container restarts) */
+    @JsonIgnore
     private byte[] templateFileData;
 
     /** Original file name (e.g. "report_template_0417.doc") */
