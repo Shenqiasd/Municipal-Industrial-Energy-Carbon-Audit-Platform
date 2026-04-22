@@ -10,6 +10,7 @@ import {
   type TplTemplate,
   type TplEditLock,
 } from '@/api/template'
+import { submitForAudit } from '@/api/audit-task'
 import SpreadSheet from '@/components/SpreadSheet/index.vue'
 
 const route = useRoute()
@@ -159,10 +160,45 @@ async function handleSubmit() {
     await submitSubmission(submissionId, versionId)
     ElMessage.success('提交成功，数据已抽取')
     isReadonly.value = true
+
+    // After successful template submission, prompt user to also submit for audit review
+    await promptSubmitForAudit()
   } catch (e: any) {
     ElMessage.error('提交失败：' + (e?.message ?? '未知错误'))
   } finally {
     submitting.value = false
+  }
+}
+
+async function promptSubmitForAudit() {
+  try {
+    await ElMessageBox.confirm(
+      '模板数据提交成功！是否同时提交审核？\n提交后审核员将收到审核任务并审查您的数据。',
+      '提交审核',
+      {
+        type: 'success',
+        confirmButtonText: '提交审核',
+        cancelButtonText: '稍后再说',
+        distinguishCancelAndClose: true,
+      }
+    )
+  } catch {
+    // User clicked "稍后再说" or closed the dialog — skip audit submission
+    return
+  }
+  try {
+    await submitForAudit(selectedYear.value)
+    ElMessage.success('已提交审核，审核员将收到审核任务')
+  } catch (e: any) {
+    const msg: string = e?.message ?? '未知错误'
+    if (msg.includes('尚未提交')) {
+      // Some templates haven't been submitted yet — inform user
+      ElMessage.warning('部分模板尚未提交，请完成所有模板填报后再提交审核')
+    } else if (msg.includes('已存在审核任务')) {
+      ElMessage.info('该年度审核任务已存在，无需重复提交')
+    } else {
+      ElMessage.error('提交审核失败：' + msg)
+    }
   }
 }
 
