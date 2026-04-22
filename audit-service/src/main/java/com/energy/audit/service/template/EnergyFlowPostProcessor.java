@@ -196,6 +196,14 @@ public class EnergyFlowPostProcessor {
      * （例如历史数据、用户手工通过 API 补录过）不覆盖，避免把 {@link #translateFlowStages}
      * 标准化完的英文值再次改写。</p>
      *
+     * <p><b>不走 {@link #safeUpdate}</b>：新布局 Sheet 11 抽取时 flow_stage 恒为空，
+     * 本方法是 {@code flow_stage = 'purchased'} 的唯一来源，也是下游
+     * {@link #deriveEnergyBalance} 聚合 purchase_amount 所依赖的前置条件。若因
+     * 列缺失/表不存在等原因静默失败（safeUpdate 吞异常），deriveEnergyBalance 会
+     * 继续把老的 de_energy_balance 软删再写入 purchase_amount=0 的错误派生数据。
+     * 异常直接上抛给 {@link #afterEnergyFlowPersist} 的外层 try/catch，短路
+     * deriveEnergyBalance，保证宁可不派生也不产生错误数据（Devin Review PR #157 指出）。</p>
+     *
      * @return 更新的行数
      */
     int deriveFlowStage(Long submissionId) {
@@ -219,7 +227,8 @@ public class EnergyFlowPostProcessor {
                 .addValue("submissionId", submissionId)
                 .addValue("purchaseSentinel", EXTERNAL_PURCHASE_SENTINEL)
                 .addValue("outputSentinel", OUTPUT_SENTINEL);
-        return safeUpdate(sql, params);
+        // NOTE: intentionally NOT using safeUpdate — see javadoc.
+        return jdbcTemplate.update(sql, params);
     }
 
     /**
