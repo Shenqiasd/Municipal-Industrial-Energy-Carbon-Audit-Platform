@@ -551,6 +551,11 @@ const HEADER_LABELS = ['购入储存环节', '加工转换环节', '分配输送
           fill="none"
           :marker-end="`url(#arrow-${e.color.replace('#', '')})`"
         />
+        <!-- NOTE: stroke/paint-order applied as inline SVG attributes (not scoped CSS)
+             because XMLSerializer does not embed Vue-scoped CSS rules when exporting PNG.
+             Previously these lived in `.edge-label {}` below and the white halo vanished
+             on export. Keeping the class for potential future overrides, but the visual
+             comes from the inline attributes. -->
         <text
           v-for="(e, i) in built.edges"
           :key="`el-${i}`"
@@ -559,6 +564,10 @@ const HEADER_LABELS = ['购入储存环节', '加工转换环节', '分配输送
           text-anchor="middle"
           font-size="10"
           :fill="e.color"
+          stroke="#fff"
+          stroke-width="3"
+          stroke-linejoin="round"
+          paint-order="stroke"
           class="edge-label"
         >{{ e.labelText }}</text>
       </g>
@@ -686,10 +695,8 @@ const HEADER_LABELS = ['购入储存环节', '加工转换环节', '分配输送
   display: block;
   background: #fff;
 }
-.edge-label {
-  paint-order: stroke;
-  stroke: #fff;
-  stroke-width: 3;
-  stroke-linejoin: round;
-}
+/* .edge-label visual (white halo via stroke + paint-order) is applied as
+   INLINE SVG attributes on each <text> in the template, NOT as scoped CSS,
+   so the styles survive XMLSerializer → Image → Canvas serialization used
+   by exportPng(). Do not re-introduce scoped CSS for stroke here. */
 </style>
