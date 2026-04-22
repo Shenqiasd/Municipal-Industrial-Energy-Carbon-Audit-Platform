@@ -73,14 +73,49 @@ public class EnergyFlowPostProcessor {
             return;
         }
         try {
+            int translated = translateFlowStages(submissionId);
             int backfilled = backfillUnitIds(submissionId, enterpriseId);
             int derived = deriveEnergyBalance(submissionId, enterpriseId, auditYear, operator);
-            log.info("EnergyFlowPostProcessor: submission {} — backfilled {} unit_ids, derived {} de_energy_balance rows",
-                    submissionId, backfilled, derived);
+            log.info("EnergyFlowPostProcessor: submission {} — translated {} flow_stage labels, backfilled {} unit_ids, derived {} de_energy_balance rows",
+                    submissionId, translated, backfilled, derived);
         } catch (Exception e) {
             // 派生失败不应阻塞主流程（Sheet 11 本体已入库），但必须让运维看到。
             log.error("EnergyFlowPostProcessor failed for submission {}: {}", submissionId, e.getMessage(), e);
         }
+    }
+
+    /**
+     * 把 {@code de_energy_flow.flow_stage} 从模板中的中文标签标准化成英文枚举，
+     * 便于前端 4 环节图布局 ({@code purchased / conversion / distribution / terminal})
+     * 以及 {@link #deriveEnergyBalance} 的 SQL 条件命中。
+     *
+     * <p>Sheet 11 "能源流程图" 的"环节"列下拉值为：</p>
+     * <ul>
+     *   <li>购入储存 → {@code purchased}</li>
+     *   <li>加工转换 → {@code conversion}</li>
+     *   <li>分配输送 → {@code distribution}</li>
+     *   <li>终端使用 → {@code terminal}</li>
+     * </ul>
+     *
+     * <p>已是英文值或空值的行不受影响（IN 匹配严格等于中文标签）。</p>
+     *
+     * @return 标准化过的行数
+     */
+    int translateFlowStages(Long submissionId) {
+        String sql =
+                "UPDATE de_energy_flow "
+                        + "SET flow_stage = CASE flow_stage "
+                        + "  WHEN '购入储存' THEN 'purchased' "
+                        + "  WHEN '加工转换' THEN 'conversion' "
+                        + "  WHEN '分配输送' THEN 'distribution' "
+                        + "  WHEN '终端使用' THEN 'terminal' "
+                        + "  ELSE flow_stage "
+                        + "END "
+                        + "WHERE submission_id = :submissionId "
+                        + "  AND deleted = 0 "
+                        + "  AND flow_stage IN ('购入储存','加工转换','分配输送','终端使用')";
+        MapSqlParameterSource params = new MapSqlParameterSource().addValue("submissionId", submissionId);
+        return safeUpdate(sql, params);
     }
 
     /**
