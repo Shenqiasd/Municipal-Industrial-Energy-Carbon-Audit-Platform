@@ -129,9 +129,10 @@ public class ReportServiceImpl implements ReportService {
         if (template == null) {
             throw new BusinessException("未找到可用的报告模板，请联系管理员上传模板");
         }
-        String templatePath = template.getTemplateFilePath();
-        if (templatePath == null || !Files.exists(Paths.get(templatePath))) {
-            throw new BusinessException("报告模板文件不存在: " + templatePath);
+        // Resolve template file: prefer DB BLOB (survives container restarts), fallback to filesystem
+        Path templatePath = resolveTemplateFile(template);
+        if (templatePath == null) {
+            throw new BusinessException("报告模板文件不存在且数据库中无模板数据，请重新上传模板");
         }
 
         // 3. Create/update report record and COMMIT in a short transaction.
@@ -184,7 +185,7 @@ public class ReportServiceImpl implements ReportService {
             metadata.put("enterpriseName", enterpriseName);
 
             byte[] docxBytes;
-            try (InputStream templateIs = new FileInputStream(templatePath)) {
+            try (InputStream templateIs = new FileInputStream(templatePath.toFile())) {
                 docxBytes = TemplateBasedReportBuilder.buildReport(
                     templateIs, submissionJson, flowChartImage, metadata);
             }
@@ -323,6 +324,7 @@ public class ReportServiceImpl implements ReportService {
         }
 
         try {
+            // Also write to filesystem as a local cache (may not survive container restart)
             Path dirPath = Paths.get(uploadDir, "templates").toAbsolutePath().normalize();
             Files.createDirectories(dirPath);
 
@@ -343,6 +345,8 @@ public class ReportServiceImpl implements ReportService {
             ArReportTemplate template = new ArReportTemplate();
             template.setTemplateName(templateName != null && !templateName.isEmpty() ? templateName : fileName);
             template.setTemplateFilePath(filePath.toString());
+            template.setTemplateFileData(fileBytes);  // Store in DB for persistence across deploys
+            template.setOriginalFileName(fileName);
             template.setVersion(maxVersion + 1);
             template.setStatus(0); // draft by default
             template.setCreateBy(username);
@@ -430,6 +434,41 @@ public class ReportServiceImpl implements ReportService {
             return null;
         }
         return reportTemplateMapper.selectById(templateId);
+    }
+
+    /**
+     * Resolve the template file path.  Priority:
+     * 1. Filesystem path (fast, if file still exists — e.g. same container that uploaded it)
+     * 2. DB BLOB → write to temp file (survives container restarts / redeployments)
+     */
+    private Path resolveTemplateFile(ArReportTemplate template) {
+        // 1. Try filesystem first
+        String fsPath = template.getTemplateFilePath();
+        if (fsPath != null && Files.exists(Paths.get(fsPath))) {
+            return Paths.get(fsPath);
+        }
+
+        // 2. Fallback: restore from DB BLOB
+        byte[] data = template.getTemplateFileData();
+        if (data != null && data.length > 0) {
+            try {
+                String suffix = ".docx";
+                String origName = template.getOriginalFileName();
+                if (origName != null && origName.toLowerCase().endsWith(".doc")) {
+                    suffix = ".doc";
+                }
+                Path tempFile = Files.createTempFile("report_template_", suffix);
+                Files.write(tempFile, data);
+                log.info("[ReportService] Restored template from DB BLOB to temp file: {}", tempFile);
+                return tempFile;
+            } catch (IOException e) {
+                log.error("Failed to write template BLOB to temp file", e);
+                return null;
+            }
+        }
+
+        log.warn("[ReportService] Template id={} has no file on disk and no BLOB in DB", template.getId());
+        return null;
     }
 
     // ====== Phase 3: Report Review Workflow (auditor side) ======
