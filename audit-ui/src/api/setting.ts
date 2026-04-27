@@ -14,6 +14,7 @@ export interface BsEnergy {
   enterpriseId?: number
   name: string
   category?: string
+  attribution?: string
   measurementUnit?: string
   equivalentValue?: number
   equalValue?: number

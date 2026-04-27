@@ -127,10 +127,22 @@ onMounted(loadData)
     <el-table v-loading="loading" :data="tableData" border stripe>
       <el-table-column prop="name" label="能源名称" min-width="140" />
       <el-table-column prop="category" label="品类" width="120" />
+      <el-table-column prop="attribution" label="归属" width="110">
+        <template #default="{ row }">
+          <el-tag
+            :type="row.attribution === '化石燃料' ? 'warning' : row.attribution === '非化石燃料' ? 'success' : 'info'"
+            size="small"
+          >
+            {{ row.attribution ?? '—' }}
+          </el-tag>
+        </template>
+      </el-table-column>
       <el-table-column prop="measurementUnit" label="计量单位" width="100" />
       <el-table-column prop="equivalentValue" label="折标系数(当量值)" width="130" />
       <el-table-column prop="equalValue" label="折标系数(等价值)" width="130" />
+      <el-table-column prop="lowHeatValue" label="低位发热量" width="120" />
       <el-table-column prop="carbonContent" label="含碳量" width="100" />
+      <el-table-column prop="oxidationRate" label="氧化率" width="90" />
       <el-table-column prop="isActive" label="状态" width="80">
         <template #default="{ row }">
           <el-tag :type="row.isActive === 1 ? 'success' : 'info'">{{ row.isActive === 1 ? '启用' : '停用' }}</el-tag>
@@ -162,6 +174,12 @@ onMounted(loadData)
         <el-form-item label="品类">
           <el-input v-model="form.category" placeholder="如：煤炭、油品" />
         </el-form-item>
+        <el-form-item label="归属">
+          <el-radio-group v-model="form.attribution">
+            <el-radio value="化石燃料">化石燃料</el-radio>
+            <el-radio value="非化石燃料">非化石燃料</el-radio>
+          </el-radio-group>
+        </el-form-item>
         <el-form-item label="计量单位">
           <el-input v-model="form.measurementUnit" placeholder="如：吨、立方米" />
         </el-form-item>
@@ -179,8 +197,20 @@ onMounted(loadData)
         </el-row>
         <el-row :gutter="16">
           <el-col :span="12">
+            <el-form-item label="低位发热量">
+              <el-input-number v-model="form.lowHeatValue" :precision="4" :min="0" style="width:100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
             <el-form-item label="含碳量">
               <el-input-number v-model="form.carbonContent" :precision="4" :min="0" style="width:100%" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="氧化率">
+              <el-input-number v-model="form.oxidationRate" :precision="6" :min="0" :max="1" style="width:100%" />
             </el-form-item>
           </el-col>
         </el-row>
