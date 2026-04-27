@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getEnterpriseSetting, upsertEnterpriseSetting, type EnterpriseSetting } from '@/api/enterpriseSetting'
 import { INDUSTRY_CLASSIFICATION, buildIndustryLookup, type IndustryNode } from '@/config/industry-classification'
@@ -18,7 +18,7 @@ const formRef = ref()
 const form = ref<Partial<EnterpriseSetting>>({})
 
 // ── Validation rules ──
-const rules = {
+const rules = computed(() => ({
   region:                 [{ required: true, message: '请选择所属地区', trigger: 'change' }],
   industryField:          [{ required: true, message: '请选择所属领域', trigger: 'change' }],
   unitNature:             [{ required: true, message: '请选择单位类型', trigger: 'change' }],
@@ -45,10 +45,10 @@ const rules = {
   compilerMobile:         [{ required: true, message: '请输入编制单位联系人电话', trigger: 'blur' }],
   compilerEmail:          [{ required: true, message: '请输入编制单位联系人邮箱', trigger: 'blur' }],
   energyCert:             [{ required: true, message: '请选择是否通过认证', trigger: 'change' }],
-  certPassDate:           [{ required: true, message: '请选择通过日期', trigger: 'change' }],
-  certAuthority:          [{ required: true, message: '请输入认证机构', trigger: 'blur' }],
+  certPassDate:           form.value.energyCert === 1 ? [{ required: true, message: '请选择通过日期', trigger: 'change' }] : [],
+  certAuthority:          form.value.energyCert === 1 ? [{ required: true, message: '请输入认证机构', trigger: 'blur' }] : [],
   hasEnergyCenter:        [{ required: true, message: '请选择是否建设能源管理中心', trigger: 'change' }],
-}
+}))
 
 // ── Industry cascading selector ──
 const industryLookup = buildIndustryLookup()
