@@ -24,8 +24,6 @@ ALTER TABLE de_saving_potential
     MODIFY COLUMN category VARCHAR(64) DEFAULT NULL COMMENT '分类/项目类型';
 ALTER TABLE de_carbon_emission
     MODIFY COLUMN emission_category VARCHAR(32) DEFAULT NULL COMMENT '排放类别';
-ALTER TABLE de_five_year_target
-    MODIFY COLUMN section_type VARCHAR(32) DEFAULT NULL COMMENT '分区类型';
 
 -- Energy purchase/consumption table fields used by 11.1.
 CALL ensure_column('de_energy_consumption', 'transfer_out',
@@ -76,6 +74,8 @@ CALL ensure_column('de_management_policy', 'supervise_dept',
     'VARCHAR(128) DEFAULT NULL COMMENT ''主管部门'' AFTER main_content');
 
 -- Sheet 16: 节能潜力明细
+CALL ensure_column('de_saving_potential', 'seq_no',
+    'INT DEFAULT NULL COMMENT ''序号'' AFTER audit_year');
 CALL ensure_column('de_saving_potential', 'project_type',
     'VARCHAR(64) DEFAULT NULL COMMENT ''项目类型'' AFTER seq_no');
 CALL ensure_column('de_saving_potential', 'carbon_reduction',
@@ -116,6 +116,8 @@ CALL ensure_column('de_rectification', 'economic_benefit',
 -- Sheet 20/21: 复杂目标表需要存宽表目标拆解、产品对比与年度目标。
 CALL ensure_column('de_five_year_target', 'section_type',
     'VARCHAR(32) DEFAULT NULL COMMENT ''分区类型'' AFTER audit_year');
+ALTER TABLE de_five_year_target
+    MODIFY COLUMN section_type VARCHAR(32) DEFAULT NULL COMMENT '分区类型';
 CALL ensure_column('de_five_year_target', 'year_label',
     'VARCHAR(32) DEFAULT NULL COMMENT ''年份/标签'' AFTER section_type');
 CALL ensure_column('de_five_year_target', 'product_name',
