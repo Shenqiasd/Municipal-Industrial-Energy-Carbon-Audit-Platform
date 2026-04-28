@@ -179,8 +179,17 @@ CALL ensure_index('de_carbon_peak_info', 'idx_submission', '(submission_id)');
 -- -----------------------------------------------------------------------------
 
 UPDATE tpl_tag_mapping
+SET deletion_source = 'MIGRATION',
+    update_by = 'migration-33',
+    update_time = NOW()
+WHERE template_version_id = 33
+  AND deleted = 1
+  AND deletion_source = 'USER'
+  AND update_by = 'migration-33';
+
+UPDATE tpl_tag_mapping
 SET deleted = 1,
-    deletion_source = 'USER',
+    deletion_source = 'MIGRATION',
     update_by = 'migration-33',
     update_time = NOW()
 WHERE template_version_id = 33
