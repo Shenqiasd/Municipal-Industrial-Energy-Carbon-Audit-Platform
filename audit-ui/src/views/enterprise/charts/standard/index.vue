@@ -30,7 +30,13 @@ async function runPrerequisiteCheck() {
     }
     prerequisitePassed.value = true
   } catch (e: any) {
+    // ElMessageBox.alert rejects if user presses Escape / close button — treat as redirect
+    if (e === 'close' || e === 'cancel') {
+      router.push('/enterprise/settings/company')
+      return
+    }
     ElMessage.error('前置校验失败：' + (e?.message ?? '未知错误'))
+    router.push('/enterprise/settings/company')
   } finally {
     checking.value = false
   }
@@ -148,5 +154,12 @@ const currentName = computed(() => route.name as string)
   overflow-y: auto;
   padding: 20px;
   background: #fafafa;
+}
+
+.loading-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
 }
 </style>
