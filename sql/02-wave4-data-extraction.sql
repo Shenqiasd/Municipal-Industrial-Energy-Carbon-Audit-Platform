@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS de_tech_indicator (
     enterprise_id                BIGINT        NOT NULL,
     audit_year                   INT           NOT NULL,
     indicator_year               INT           NOT NULL,
+    row_seq                      INT,
     gross_output                 DECIMAL(18,4),
     sales_revenue                DECIMAL(18,4),
     tax_paid                     DECIMAL(18,4),

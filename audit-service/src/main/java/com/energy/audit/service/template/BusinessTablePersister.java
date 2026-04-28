@@ -227,6 +227,10 @@ public class BusinessTablePersister {
             dbRow.put("create_by", operator);
             dbRow.put("update_by", operator);
             dbRow.put("deleted", 0);
+            Object rowIndex = row.get("_rowIndex");
+            if (rowIndex instanceof Number && isKnownColumn(tableName, "row_seq")) {
+                dbRow.put("row_seq", rowIndex);
+            }
 
             for (Map.Entry<String, Object> entry : row.entrySet()) {
                 String key = entry.getKey();

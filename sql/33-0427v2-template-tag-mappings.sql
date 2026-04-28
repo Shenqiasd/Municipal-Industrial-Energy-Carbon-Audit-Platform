@@ -56,8 +56,10 @@ CALL ensure_column('de_tech_reform_history', 'is_contract_energy',
     'VARCHAR(8) DEFAULT NULL COMMENT ''是否合同能源管理模式'' AFTER actual_saving');
 
 -- Sheet 3: 主要技术指标下部表为行项目/今年/去年/增减结构。
+CALL ensure_column('de_tech_indicator', 'row_seq',
+    'INT DEFAULT NULL COMMENT ''模板行序号'' AFTER indicator_year');
 CALL ensure_column('de_tech_indicator', 'project_name',
-    'VARCHAR(128) DEFAULT NULL COMMENT ''项目名称'' AFTER indicator_year');
+    'VARCHAR(128) DEFAULT NULL COMMENT ''项目名称'' AFTER row_seq');
 CALL ensure_column('de_tech_indicator', 'unit',
     'VARCHAR(64) DEFAULT NULL COMMENT ''计量单位'' AFTER project_name');
 CALL ensure_column('de_tech_indicator', 'current_year',
@@ -68,6 +70,41 @@ CALL ensure_column('de_tech_indicator', 'change_pct',
     'DECIMAL(18,4) DEFAULT NULL COMMENT ''增减百分比'' AFTER prev_year');
 CALL ensure_column('de_tech_indicator', 'material_adjustment',
     'DECIMAL(18,4) DEFAULT NULL COMMENT ''扣原料'' AFTER change_pct');
+
+SET @idx_exists := (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'de_tech_indicator'
+      AND INDEX_NAME = 'uk_enterprise_year_indicator'
+);
+SET @sql_drop_idx := IF(
+    @idx_exists > 0,
+    'ALTER TABLE de_tech_indicator DROP INDEX uk_enterprise_year_indicator',
+    'SELECT 1'
+);
+PREPARE stmt_drop_idx FROM @sql_drop_idx;
+EXECUTE stmt_drop_idx;
+DEALLOCATE PREPARE stmt_drop_idx;
+SET @idx_exists := (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'de_tech_indicator'
+      AND INDEX_NAME = 'idx_enterprise_year'
+);
+SET @sql_drop_idx := IF(
+    @idx_exists > 0,
+    'ALTER TABLE de_tech_indicator DROP INDEX idx_enterprise_year',
+    'SELECT 1'
+);
+PREPARE stmt_drop_idx FROM @sql_drop_idx;
+EXECUTE stmt_drop_idx;
+DEALLOCATE PREPARE stmt_drop_idx;
+CALL ensure_index('de_tech_indicator', 'idx_enterprise_year_indicator',
+    '(enterprise_id, audit_year, indicator_year)');
+CALL ensure_index('de_tech_indicator', 'idx_submission_row_seq',
+    '(submission_id, row_seq)');
 
 -- Sheet 6: 能源管理制度历史 schema 兼容。
 CALL ensure_column('de_management_policy', 'supervise_dept',
@@ -185,7 +222,14 @@ SET deletion_source = 'MIGRATION',
 WHERE template_version_id = 33
   AND deleted = 1
   AND deletion_source = 'USER'
-  AND update_by = 'migration-33';
+  AND create_by = 'migration-33';
+
+-- Version 33 is maintained by this migration; remove prior migration rows before rebuilding.
+DELETE FROM tpl_tag_mapping
+WHERE template_version_id = 33
+  AND deleted = 1
+  AND deletion_source = 'MIGRATION'
+  AND create_by = 'migration-33';
 
 UPDATE tpl_tag_mapping
 SET deleted = 1,
@@ -228,7 +272,7 @@ FROM (
     -- Sheet 3: 主要技术指标 TABLE（实际 A15:F42）
     UNION ALL SELECT '表3_技术指标','de_tech_indicator','de_tech_indicator','STRING',3,'3.主要技术指标','A15:F42','TABLE','CELL_RANGE',0,NULL,
            '[{"col":0,"field":"project_name","label":"项目名称","type":"STRING"},{"col":1,"field":"unit","label":"计量单位","type":"STRING"},{"col":2,"field":"current_year","label":"今年","type":"NUMBER"},{"col":3,"field":"prev_year","label":"去年","type":"NUMBER"},{"col":4,"field":"change_pct","label":"变化率（%）","type":"NUMBER"},{"col":5,"field":"material_adjustment","label":"扣除原材料后","type":"NUMBER"}]',
-           '0428 数据区仍为 A15:F42；F15:F18/F25:F27 由合并空白改为固定 -，字段结构不变'
+           '0428 数据区仍为 A15:F42；de_tech_indicator 已放宽唯一索引并记录 row_seq，支持多指标行落库'
     -- Sheet 4
     UNION ALL SELECT '表4_计量器具','de_meter_instrument','de_meter_instrument','STRING',4,'4.能源计量器具汇总','A3:O202','TABLE','CELL_RANGE',0,NULL,
            '[{"col":0,"field":"seq_no","label":"序号","type":"NUMBER"},{"col":1,"field":"management_no","label":"管理编号","type":"STRING"},{"col":2,"field":"model_spec","label":"型号规格","type":"STRING"},{"col":3,"field":"manufacturer","label":"生产厂家","type":"STRING"},{"col":4,"field":"factory_no","label":"出厂编号","type":"STRING"},{"col":5,"field":"meter_name","label":"计量表名称","type":"STRING"},{"col":6,"field":"multiplier","label":"倍率","type":"NUMBER"},{"col":7,"field":"grade","label":"级别","type":"STRING"},{"col":8,"field":"energy_attribute","label":"能源类型","type":"STRING"},{"col":9,"field":"measure_range","label":"测量范围","type":"STRING"},{"col":10,"field":"department","label":"所属部门","type":"STRING"},{"col":11,"field":"accuracy_grade","label":"准确度等级","type":"STRING"},{"col":12,"field":"install_location","label":"安装位置/检定日期","type":"STRING"},{"col":13,"field":"status","label":"状态/下次检定","type":"STRING"},{"col":14,"field":"remark","label":"备注","type":"STRING"}]',NULL
