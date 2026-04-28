@@ -1,14 +1,14 @@
-# 0427v2 新模板映射执行说明
+# 0428 新模板映射执行说明
 
 ## 已确认的执行策略
 
-- 新模板文件：`0427v2.xlsx`，共 40 个 Sheet，其中 21 个为填报/映射 Sheet。
+- 新模板文件：`0428.xlsx`（由 `0427v2.xlsx` 更新而来），共 40 个 Sheet，其中 21 个为填报/映射 Sheet。
 - 新模板版本：`tpl_template_version.id = 33`。
 - 对标旧模板：`AUDIT_FULL_0412 / version 31`。
 - SpreadJS Node 侧无法稳定把 xlsx 直接转为 templateJson，因此本次采用系统现有支持的 `CELL_RANGE`/`cell_range` TABLE 映射兜底，不依赖 Named Range 先存在。
 - `BusinessTablePersister.ALLOWED_TABLES` 已包含本次需要的独立业务表：`de_saving_potential`、`de_management_suggestion`、`de_tech_reform_suggestion`、`de_rectification`、`de_carbon_peak_info` 等，无需新增 Java allow-list。
 
-## 与用户方案相比的补充/修正
+## 与用户方案/0427v2 相比的补充/修正
 
 1. **Sheet 名以实际工作簿为准**  
    Excel/SpreadJS 中的实际 Sheet 名为中文短名/规范名（例如 `1.十四五已实施节能技改项目`、`15,温室气体排放排放汇总`），迁移按实际名称写入，避免抽取时按 sheet_name 找不到 Sheet。
@@ -25,8 +25,8 @@
 5. **Sheet 13/16/17/18/19 使用独立业务表**  
    不是统一落 `de_submission_table`。迁移补齐新增字段（减碳量、项目类型、投资、整改经济效益等），避免业务表持久化时字段被跳过。
 
-6. **Sheet 14 实际为审计年/基年两列**  
-   不是单纯 B2:B6 五个固定值；迁移按 `de_saving_calculation` 的 current/base 字段配置 8 个 SCALAR tag。
+6. **Sheet 14 实际为审计期/基准期两列**  
+   不是单纯 B2:B6 五个固定值；0428 将表头从“审计年/基准年”改为“审计期/基准期”，迁移仍按 `de_saving_calculation` 的 current/base 字段配置 8 个 SCALAR tag。
 
 7. **Sheet 15 表和标量并存**  
    化石燃料明细配置为 `A26:H33`，并按方案加入 `attribution=化石燃料` 的 CONFIG_PREFILL 过滤。`de_carbon_emission.emission_category` 历史为 NOT NULL，本迁移放宽为可空，避免模板没有类别列时业务表写入失败。
@@ -36,6 +36,16 @@
 
 9. **Sheet 3 SCALAR 目标表拆分**  
    能源领导/部门等企业配置字段落 `ent_enterprise_setting`，专兼职人数/目标值等审计年度字段落 `de_company_overview`。这是为了匹配现有 `DataPersistenceServiceImpl` 对企业设置表的专门同步逻辑。
+
+## 0428 相对 0427v2 的逐项核对结论
+
+- Sheet 数量仍为 40，Sheet 顺序/名称未变。
+- 只有 4 张 Sheet 有内容变化：`3.主要技术指标`、`8.重点用能设备汇总管理`、`14.节能量计算数据`、`15,温室气体排放排放汇总`。
+- 所有 TABLE 数据区范围未位移，仍维持 21 个 TABLE、32 个 SCALAR、9 个 CONFIG_PREFILL，共 62 个 active mappings。
+- Sheet 3：A5 文案改为“单位主管节能领导姓名/职务”，A7 改为“能源管理负责人姓名”，A28 改为“3.节能降碳指标”；部分 F 列由合并空白改为固定 `-`，字段结构不变。
+- Sheet 8：K2 从“能效级别”改为“能效等级”；仍映射到 `energy_efficiency_level`。
+- Sheet 14：B2/C2 从“审计年/基准年”改为“审计期/基准期”；current/base 字段结构不变。
+- Sheet 15：单位产值碳排放文案统一为 `CO₂`；绿电抵消排放因子从 `4.84` 改为 `0`，电力热力排放合计公式改为 `=E39+(D40-D41)*C40`；`GREEN_ELEC_OFFSET` 仍抽取 E41（购买绿电抵消排放量）。
 
 ## 仍需要人工确认/后续测试的点
 
