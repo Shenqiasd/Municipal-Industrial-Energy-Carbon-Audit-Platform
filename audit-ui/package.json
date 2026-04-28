@@ -26,7 +26,8 @@
     "tinymce": "^6.8.5",
     "vue": "^3.4.21",
     "vue-echarts": "^8.0.1",
-    "vue-router": "^4.3.0"
+    "vue-router": "^4.3.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@grapecity/spread-sheets": "18.2.5",

@@ -1,304 +1,113 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
-import ChartCard from '@/components/ChartCard/index.vue'
-import { getEnergyStructure, getEnergyTrend, getProductConsumption, getGhgEmission } from '@/api/chartData'
-import type { EChartsOption } from 'echarts'
+import { useRoute } from 'vue-router'
+import { computed } from 'vue'
 
-const auditYear = ref(new Date().getFullYear())
-const loading = reactive({
-  structure: false,
-  trend: false,
-  product: false,
-  ghg: false,
-})
+const route = useRoute()
 
-const structureOption = ref<EChartsOption>({})
-const trendOption = ref<EChartsOption>({})
-const productOption = ref<EChartsOption>({})
-const ghgOption = ref<EChartsOption>({})
+const navItems = [
+  { label: '1. 用能单位基本情况', name: 'StandardBasicInfo' },
+  { label: '2. 企业概况及主要技术指标一览表', name: 'StandardEnterpriseOverview' },
+  { label: '3. 上一轮已实施的节能技改项目表', name: 'StandardRetrofitProjects' },
+  { label: '4. 主要用能设备汇总表', name: 'StandardMajorEquipment' },
+  { label: '5. 能源流程图', name: 'StandardEnergyFlow' },
+  { label: '6. 能源计量器具汇总表', name: 'StandardMeterSummary' },
+  { label: '7. 能源计量器具配备率表', name: 'StandardMeterRate' },
+  { label: '8. 温室气体排放表', name: 'StandardGhgEmission' },
+  { label: '9. 能源消费平衡综合表', name: 'StandardEnergyBalance' },
+  { label: '10. 重点用能设备能效对标表', name: 'StandardEquipmentBenchmark' },
+  { label: '11. 淘汰产品、设备、装置、工艺和生产能力目录表', name: 'StandardObsoleteEquipment' },
+  { label: '12. 企业产品能源成本表', name: 'StandardProductEnergyCost' },
+  { label: '13. 设备测试报告主要指标汇总表', name: 'StandardTestIndicators' },
+  { label: '14. 节能潜力明细表', name: 'StandardSavingPotential' },
+  { label: '15. 能源管理改进建议表', name: 'StandardMgmtSuggestions' },
+  { label: '16. 节能技术改造建议汇总表', name: 'StandardRetrofitSuggestions' },
+  { label: '17. 节能整改措施表', name: 'StandardRectification' },
+  { label: '18. 十五五期间节能目标', name: 'StandardFiveYearTarget' },
+]
 
-const yearOptions = computed(() => {
-  const current = new Date().getFullYear()
-  return Array.from({ length: 5 }, (_, i) => current - i)
-})
-
-onMounted(() => {
-  loadAllCharts()
-})
-
-async function loadAllCharts() {
-  await Promise.all([
-    loadEnergyStructure(),
-    loadEnergyTrend(),
-    loadProductConsumption(),
-    loadGhgEmission(),
-  ])
-}
-
-async function loadEnergyStructure() {
-  loading.structure = true
-  try {
-    const data = await getEnergyStructure(auditYear.value) as any[]
-    if (!data || !data.length) {
-      structureOption.value = emptyOption('暂无能源消费数据')
-      return
-    }
-    const total = data.reduce((s: number, d: any) => s + (d.VALUE || d.value || 0), 0)
-    // Detect unit: if backend returns 'tce' unit, use it; otherwise show generic label
-    const firstUnit = data[0]?.UNIT || data[0]?.unit || ''
-    const isTce = firstUnit === 'tce'
-    const unitLabel = isTce ? 'tce' : '消耗量'
-    const subtextLabel = isTce ? '总能耗 (折标煤)' : '总能源消耗'
-    structureOption.value = {
-      tooltip: {
-        trigger: 'item',
-        formatter: (p: any) => `${p.name}: ${p.value.toFixed(1)} ${unitLabel} (${p.percent}%)`,
-      },
-      legend: { orient: 'vertical', right: 20, top: 'center' },
-      series: [
-        {
-          type: 'pie',
-          radius: ['40%', '70%'],
-          center: ['40%', '50%'],
-          avoidLabelOverlap: true,
-          itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
-          label: { show: true, formatter: '{b}\n{d}%' },
-          data: data.map((d: any) => ({
-            name: d.NAME || d.name,
-            value: d.VALUE || d.value,
-          })),
-        },
-      ],
-      title: {
-        text: `${total.toFixed(0)} ${unitLabel}`,
-        subtext: subtextLabel,
-        left: '40%',
-        top: '38%',
-        textAlign: 'center',
-        textStyle: { fontSize: 18, fontWeight: 'bold', color: '#303133' },
-        subtextStyle: { fontSize: 12, color: '#909399' },
-      },
-    }
-  } catch (e) {
-    structureOption.value = emptyOption('加载失败')
-  } finally {
-    loading.structure = false
-  }
-}
-
-async function loadEnergyTrend() {
-  loading.trend = true
-  try {
-    const data = await getEnergyTrend(auditYear.value) as any[]
-    if (!data || !data.length) {
-      trendOption.value = emptyOption('暂无趋势数据')
-      return
-    }
-    const years = data.map((d: any) => String(d.YEAR || d.year))
-    const totalEnergy = data.map((d: any) => d.TOTALENERGY || d.totalEnergy || 0)
-    const unitEnergy = data.map((d: any) => d.UNITENERGY || d.unitEnergy || 0)
-    const grossOutput = data.map((d: any) => d.GROSSOUTPUT || d.grossOutput || 0)
-
-    trendOption.value = {
-      tooltip: { trigger: 'axis' },
-      legend: { data: ['综合能耗(tce)', '工业总产值(万元)', '单位产值能耗(tce/万元)'] },
-      grid: { left: 70, right: 70, bottom: 40 },
-      xAxis: { type: 'category', data: years },
-      yAxis: [
-        { type: 'value', name: '能耗(tce)', position: 'left' },
-        { type: 'value', name: '产值(万元) / 单耗(tce/万元)', position: 'right', splitLine: { show: false } },
-      ],
-      series: [
-        {
-          name: '综合能耗(tce)',
-          type: 'bar',
-          yAxisIndex: 0,
-          data: totalEnergy,
-          itemStyle: { color: '#409EFF', borderRadius: [4, 4, 0, 0] },
-          barMaxWidth: 40,
-        },
-        {
-          name: '工业总产值(万元)',
-          type: 'bar',
-          yAxisIndex: 1,
-          data: grossOutput,
-          itemStyle: { color: '#67C23A', borderRadius: [4, 4, 0, 0] },
-          barMaxWidth: 40,
-        },
-        {
-          name: '单位产值能耗(tce/万元)',
-          type: 'line',
-          yAxisIndex: 1,
-          data: unitEnergy,
-          smooth: true,
-          symbol: 'circle',
-          symbolSize: 8,
-          lineStyle: { width: 2, color: '#E6A23C' },
-          itemStyle: { color: '#E6A23C' },
-        },
-      ],
-    }
-  } catch (e) {
-    trendOption.value = emptyOption('加载失败')
-  } finally {
-    loading.trend = false
-  }
-}
-
-async function loadProductConsumption() {
-  loading.product = true
-  try {
-    const data = await getProductConsumption(auditYear.value) as any[]
-    if (!data || !data.length) {
-      productOption.value = emptyOption('暂无产品单耗数据')
-      return
-    }
-    const products = data.map((d: any) => d.PRODUCTNAME || d.productName)
-    const currentValues = data.map((d: any) => d.UNITCONSUMPTION || d.unitConsumption || 0)
-    const baseValues = data.map((d: any) => d.BASECONSUMPTION || d.baseConsumption || 0)
-
-    const series: any[] = [
-      {
-        name: '审计年单耗',
-        type: 'bar',
-        barMaxWidth: 36,
-        itemStyle: { color: '#409EFF', borderRadius: [4, 4, 0, 0] },
-        data: currentValues,
-      },
-    ]
-    // Only show base year if any base values exist
-    if (baseValues.some((v: number) => v > 0)) {
-      series.push({
-        name: '基期单耗',
-        type: 'bar',
-        barMaxWidth: 36,
-        itemStyle: { color: '#E6A23C', borderRadius: [4, 4, 0, 0] },
-        data: baseValues,
-      })
-    }
-
-    productOption.value = {
-      tooltip: { trigger: 'axis' },
-      legend: { data: series.map((s: any) => s.name) },
-      grid: { left: 60, right: 20, bottom: 40 },
-      xAxis: { type: 'category', data: products, axisLabel: { rotate: products.length > 4 ? 30 : 0 } },
-      yAxis: { type: 'value', name: '单耗' },
-      series,
-    }
-  } catch (e) {
-    productOption.value = emptyOption('加载失败')
-  } finally {
-    loading.product = false
-  }
-}
-
-async function loadGhgEmission() {
-  loading.ghg = true
-  try {
-    const data = await getGhgEmission(auditYear.value) as any[]
-    if (!data || !data.length) {
-      ghgOption.value = emptyOption('暂无排放数据')
-      return
-    }
-    const byType: Record<string, number> = {}
-    const byEnergy: { name: string; value: number }[] = []
-    for (const d of data) {
-      const et = d.EMISSIONTYPE || d.emissionType
-      const en = d.ENERGYNAME || d.energyName
-      const val = d.ANNUALEMISSION || d.annualEmission || 0
-      byType[et] = (byType[et] || 0) + val
-      byEnergy.push({ name: en, value: val })
-    }
-
-    ghgOption.value = {
-      tooltip: { trigger: 'item' },
-      legend: { bottom: 0 },
-      series: [
-        {
-          name: '排放类型',
-          type: 'pie',
-          radius: [0, '35%'],
-          label: { position: 'inner', fontSize: 11, color: '#fff' },
-          data: Object.entries(byType).map(([name, value]) => ({ name, value })),
-          itemStyle: { borderColor: '#fff', borderWidth: 2 },
-        },
-        {
-          name: '能源品种',
-          type: 'pie',
-          radius: ['45%', '65%'],
-          label: { formatter: '{b}\n{c} tCO\u2082', fontSize: 11 },
-          data: byEnergy.map((d) => ({ name: d.name, value: d.value })),
-          itemStyle: { borderRadius: 4, borderColor: '#fff', borderWidth: 2 },
-        },
-      ],
-    }
-  } catch (e) {
-    ghgOption.value = emptyOption('加载失败')
-  } finally {
-    loading.ghg = false
-  }
-}
-
-function emptyOption(text: string): EChartsOption {
-  return {
-    title: {
-      text,
-      left: 'center',
-      top: 'center',
-      textStyle: { color: '#c0c4cc', fontSize: 14, fontWeight: 'normal' },
-    },
-  }
-}
-
-function onYearChange() {
-  loadAllCharts()
-}
+const currentName = computed(() => route.name as string)
 </script>
 
 <template>
-  <div class="standard-charts-page">
-    <div class="page-header">
-      <h3>规定图表</h3>
-      <el-select v-model="auditYear" style="width: 120px" @change="onYearChange">
-        <el-option v-for="y in yearOptions" :key="y" :label="`${y}年`" :value="y" />
-      </el-select>
-    </div>
-
-    <el-row :gutter="16">
-      <el-col :xs="24" :lg="12">
-        <ChartCard title="能源消费结构" :option="structureOption" :loading="loading.structure" />
-      </el-col>
-      <el-col :xs="24" :lg="12">
-        <ChartCard title="温室气体排放构成" :option="ghgOption" :loading="loading.ghg" />
-      </el-col>
-    </el-row>
-
-    <el-row :gutter="16">
-      <el-col :xs="24" :lg="12">
-        <ChartCard title="能耗趋势与单位产值能耗" :option="trendOption" :loading="loading.trend" />
-      </el-col>
-      <el-col :xs="24" :lg="12">
-        <ChartCard title="产品单位能耗对比" :option="productOption" :loading="loading.product" />
-      </el-col>
-    </el-row>
+  <div class="standard-layout">
+    <aside class="standard-sidebar">
+      <div class="sidebar-title">规定图表</div>
+      <nav class="sidebar-nav">
+        <router-link
+          v-for="item in navItems"
+          :key="item.name"
+          :to="{ name: item.name }"
+          class="nav-item"
+          :class="{ active: currentName === item.name }"
+        >
+          {{ item.label }}
+        </router-link>
+      </nav>
+    </aside>
+    <main class="standard-content">
+      <router-view />
+    </main>
   </div>
 </template>
 
 <style scoped lang="scss">
-.standard-charts-page {
-  padding: 20px;
+.standard-layout {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
 }
 
-.page-header {
+.standard-sidebar {
+  width: 280px;
+  min-width: 280px;
+  background: #fff;
+  border-right: 1px solid #e8e8e8;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
+  flex-direction: column;
+  overflow-y: auto;
+}
 
-  h3 {
-    margin: 0;
-    font-size: 18px;
-    color: #303133;
+.sidebar-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #303133;
+  padding: 16px;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0;
+}
+
+.nav-item {
+  padding: 10px 16px;
+  font-size: 13px;
+  color: #606266;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  line-height: 1.4;
+
+  &:hover {
+    background: #f0f7ff;
+    color: #1890ff;
   }
+
+  &.active,
+  &.router-link-active {
+    background: #e6f4ff;
+    color: #1890ff;
+    font-weight: 600;
+    border-right: 3px solid #1890ff;
+  }
+}
+
+.standard-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  background: #fafafa;
 }
 </style>
