@@ -3,11 +3,13 @@ import { ref, onMounted } from 'vue'
 import { getEnterpriseSetting } from '@/api/enterpriseSetting'
 import type { EnterpriseSetting } from '@/api/enterpriseSetting'
 import { queryExtractedTable } from '@/api/extracted-data'
+import { useUserStore } from '@/stores/user'
 import InfoRow from '../components/InfoRow.vue'
 import SectionTitle from '../components/SectionTitle.vue'
 import RegulationTable from '../components/RegulationTable.vue'
 import type { RegColumn } from '../components/RegulationTable.vue'
 
+const userStore = useUserStore()
 const loading = ref(false)
 const info = ref<EnterpriseSetting>({})
 const indicatorRows = ref<Record<string, unknown>[]>([])
@@ -47,7 +49,7 @@ onMounted(async () => {
 
     <div class="info-table">
       <InfoRow :items="[
-        { label: '单位名称', value: info.unitAddress || info.enterpriseAddress },
+        { label: '单位名称', value: userStore.userInfo?.enterpriseName },
         { label: '法人代码', value: info.adminDivisionCode },
       ]" />
       <InfoRow :items="[

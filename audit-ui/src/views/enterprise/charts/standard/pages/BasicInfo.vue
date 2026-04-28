@@ -3,10 +3,13 @@ import { ref, onMounted } from 'vue'
 import { getEnterpriseSetting } from '@/api/enterpriseSetting'
 import type { EnterpriseSetting } from '@/api/enterpriseSetting'
 import { queryExtractedTable } from '@/api/extracted-data'
+import { useUserStore } from '@/stores/user'
 import InfoRow from '../components/InfoRow.vue'
 import SectionTitle from '../components/SectionTitle.vue'
 import RegulationTable from '../components/RegulationTable.vue'
 import type { RegColumn } from '../components/RegulationTable.vue'
+
+const userStore = useUserStore()
 
 const loading = ref(false)
 const info = ref<EnterpriseSetting>({})
@@ -59,7 +62,7 @@ function certLabel(val: unknown): string {
 
     <div class="info-table">
       <InfoRow :items="[
-        { label: '单位名称', value: info.enterpriseAddress ? undefined : undefined },
+        { label: '单位名称', value: userStore.userInfo?.enterpriseName },
         { label: '统一社会信用代码', value: info.adminDivisionCode },
       ]" />
       <InfoRow :items="[
