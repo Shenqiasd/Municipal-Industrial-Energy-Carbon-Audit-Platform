@@ -120,6 +120,18 @@ ALTER TABLE de_five_year_target
     MODIFY COLUMN section_type VARCHAR(32) DEFAULT NULL COMMENT '分区类型';
 CALL ensure_column('de_five_year_target', 'year_label',
     'VARCHAR(32) DEFAULT NULL COMMENT ''年份/标签'' AFTER section_type');
+CALL ensure_column('de_five_year_target', 'gross_output_actual2025',
+    'DECIMAL(18,4) DEFAULT NULL COMMENT ''2025年实际产值'' AFTER year_label');
+CALL ensure_column('de_five_year_target', 'gross_output_target2030',
+    'DECIMAL(18,4) DEFAULT NULL COMMENT ''2030年目标产值'' AFTER gross_output_actual2025');
+CALL ensure_column('de_five_year_target', 'energy_equal_actual2025',
+    'DECIMAL(18,4) DEFAULT NULL COMMENT ''2025年综合能耗等价值'' AFTER gross_output_target2030');
+CALL ensure_column('de_five_year_target', 'energy_equal_target2030',
+    'DECIMAL(18,4) DEFAULT NULL COMMENT ''2030年目标综合能耗等价值'' AFTER energy_equal_actual2025');
+CALL ensure_column('de_five_year_target', 'energy_equiv_actual2025',
+    'DECIMAL(18,4) DEFAULT NULL COMMENT ''2025年综合能耗当量值'' AFTER energy_equal_target2030');
+CALL ensure_column('de_five_year_target', 'energy_equiv_target2030',
+    'DECIMAL(18,4) DEFAULT NULL COMMENT ''2030年目标综合能耗当量值'' AFTER energy_equiv_actual2025');
 CALL ensure_column('de_five_year_target', 'product_name',
     'VARCHAR(128) DEFAULT NULL COMMENT ''产品名称'' AFTER decline_rate');
 CALL ensure_column('de_five_year_target', 'indicator_name',
@@ -274,12 +286,12 @@ FROM (
     UNION ALL SELECT '表20_年度目标','de_five_year_target','de_five_year_target','STRING',20,'20.碳达峰信息','A11:H14','TABLE','CELL_RANGE',0,NULL,
            '[{"col":0,"field":"target_name","label":"目标名称","type":"STRING"},{"col":1,"field":"measurement_unit","label":"计量单位","type":"STRING"},{"col":2,"field":"y2025","label":"2025年","type":"NUMBER"},{"col":3,"field":"y2026","label":"2026年","type":"NUMBER"},{"col":4,"field":"y2027","label":"2027年","type":"NUMBER"},{"col":5,"field":"y2028","label":"2028年","type":"NUMBER"},{"col":6,"field":"y2029","label":"2029年","type":"NUMBER"},{"col":7,"field":"y2030","label":"2030年","type":"NUMBER"}]','实际含 2025 现状列，方案漏列'
     -- Sheet 21
-    UNION ALL SELECT 'ACT_2025_OUTPUT','grossOutput','de_five_year_target','NUMBER',21,'21.“十五五”期间节能目标',NULL,'SCALAR','CELL_TAG',NULL,NULL,NULL,'A4:2025年实际产值'
-    UNION ALL SELECT 'ACT_2025_ENERGY_EQUIV','energyEqual','de_five_year_target','NUMBER',21,'21.“十五五”期间节能目标',NULL,'SCALAR','CELL_TAG',NULL,NULL,NULL,'C4:2025年综合能耗等价值'
-    UNION ALL SELECT 'ACT_2025_ENERGY_CURR','energyEquiv','de_five_year_target','NUMBER',21,'21.“十五五”期间节能目标',NULL,'SCALAR','CELL_TAG',NULL,NULL,NULL,'C5:2025年综合能耗当量值'
-    UNION ALL SELECT 'TGT_2030_OUTPUT','grossOutput','de_five_year_target','NUMBER',21,'21.“十五五”期间节能目标',NULL,'SCALAR','CELL_TAG',NULL,NULL,NULL,'E4:2030年目标产值'
-    UNION ALL SELECT 'TGT_2030_ENERGY_EQUIV','energyEqual','de_five_year_target','NUMBER',21,'21.“十五五”期间节能目标',NULL,'SCALAR','CELL_TAG',NULL,NULL,NULL,'G4:2030年目标综合能耗等价值'
-    UNION ALL SELECT 'TGT_2030_ENERGY_CURR','energyEquiv','de_five_year_target','NUMBER',21,'21.“十五五”期间节能目标',NULL,'SCALAR','CELL_TAG',NULL,NULL,NULL,'G5:2030年目标综合能耗当量值'
+    UNION ALL SELECT 'ACT_2025_OUTPUT','grossOutputActual2025','de_five_year_target','NUMBER',21,'21.“十五五”期间节能目标',NULL,'SCALAR','CELL_TAG',NULL,NULL,NULL,'A4:2025年实际产值'
+    UNION ALL SELECT 'ACT_2025_ENERGY_EQUIV','energyEqualActual2025','de_five_year_target','NUMBER',21,'21.“十五五”期间节能目标',NULL,'SCALAR','CELL_TAG',NULL,NULL,NULL,'C4:2025年综合能耗等价值'
+    UNION ALL SELECT 'ACT_2025_ENERGY_CURR','energyEquivActual2025','de_five_year_target','NUMBER',21,'21.“十五五”期间节能目标',NULL,'SCALAR','CELL_TAG',NULL,NULL,NULL,'C5:2025年综合能耗当量值'
+    UNION ALL SELECT 'TGT_2030_OUTPUT','grossOutputTarget2030','de_five_year_target','NUMBER',21,'21.“十五五”期间节能目标',NULL,'SCALAR','CELL_TAG',NULL,NULL,NULL,'E4:2030年目标产值'
+    UNION ALL SELECT 'TGT_2030_ENERGY_EQUIV','energyEqualTarget2030','de_five_year_target','NUMBER',21,'21.“十五五”期间节能目标',NULL,'SCALAR','CELL_TAG',NULL,NULL,NULL,'G4:2030年目标综合能耗等价值'
+    UNION ALL SELECT 'TGT_2030_ENERGY_CURR','energyEquivTarget2030','de_five_year_target','NUMBER',21,'21.“十五五”期间节能目标',NULL,'SCALAR','CELL_TAG',NULL,NULL,NULL,'G5:2030年目标综合能耗当量值'
     UNION ALL SELECT '表21_产品单耗','de_five_year_target','de_five_year_target','STRING',21,'21.“十五五”期间节能目标','A7:I9','TABLE','CELL_RANGE',0,NULL,
            '[{"col":0,"field":"product_name","label":"2025产品名称","type":"STRING"},{"col":1,"field":"indicator_name","label":"2025单耗指标名","type":"STRING"},{"col":2,"field":"actual_value","label":"2025单耗指标值","type":"NUMBER"},{"col":3,"field":"indicator_value","label":"2025单耗实际值","type":"NUMBER"},{"col":4,"field":"target_name","label":"2030产品名称","type":"STRING"},{"col":5,"field":"year_label","label":"2030单耗指标名","type":"STRING"},{"col":6,"field":"y2030","label":"2030单耗指标值","type":"NUMBER"},{"col":7,"field":"unit_energy_equal","label":"2030单耗实际值","type":"NUMBER"},{"col":8,"field":"decline_rate","label":"单耗指标下降率%","type":"NUMBER"}]',NULL
     UNION ALL SELECT '表21_年度节能','de_five_year_target','de_five_year_target','STRING',21,'21.“十五五”期间节能目标','A12:G16','TABLE','CELL_RANGE',0,NULL,
