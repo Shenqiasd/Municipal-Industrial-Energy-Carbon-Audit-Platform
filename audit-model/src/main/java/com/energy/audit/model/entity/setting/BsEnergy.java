@@ -26,6 +26,9 @@ public class BsEnergy extends BaseEntity {
     /** Energy category (dictionary: solid/liquid/gas/electricity/heat etc.) */
     private String category;
 
+    /** Attribution type (化石燃料/非化石燃料) */
+    private String attribution;
+
     /** Measurement unit */
     private String measurementUnit;
 

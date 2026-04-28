@@ -333,6 +333,7 @@ CREATE TABLE `bs_energy` (
     `enterprise_id`    BIGINT        NOT NULL                COMMENT '企业ID -> ent_enterprise.id',
     `name`             VARCHAR(128)  NOT NULL                COMMENT '名称',
     `category`         VARCHAR(64)   NOT NULL                COMMENT '类别(字典: 固体燃料/液体燃料/气体燃料/电力/热力等)',
+    `attribution`      VARCHAR(20)   DEFAULT NULL            COMMENT '归属类型: 化石燃料/非化石燃料',
     `measurement_unit` VARCHAR(32)   DEFAULT NULL            COMMENT '计量单位',
     `equivalent_value` DECIMAL(18,6) DEFAULT NULL            COMMENT '当量值',
     `equal_value`      DECIMAL(18,6) DEFAULT NULL            COMMENT '等价值',

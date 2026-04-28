@@ -24,6 +24,9 @@ public class BsEnergyCatalog extends BaseEntity {
     /** Energy category (dictionary: energy_category) */
     private String category;
 
+    /** Attribution type (化石燃料/非化石燃料) */
+    private String attribution;
+
     /** Measurement unit */
     private String measurementUnit;
 

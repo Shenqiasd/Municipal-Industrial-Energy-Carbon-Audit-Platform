@@ -98,6 +98,7 @@ public class EnergySettingServiceImpl implements EnergySettingService {
             energy.setEnterpriseId(enterpriseId);
             energy.setName(catalog.getName());
             energy.setCategory(catalog.getCategory());
+            energy.setAttribution(catalog.getAttribution());
             energy.setMeasurementUnit(catalog.getMeasurementUnit());
             energy.setEquivalentValue(catalog.getEquivalentValue());
             energy.setEqualValue(catalog.getEqualValue());

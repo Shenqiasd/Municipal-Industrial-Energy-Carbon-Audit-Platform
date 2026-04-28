@@ -7,6 +7,7 @@
         <id     column="id"               property="id"/>
         <result column="name"             property="name"/>
         <result column="category"         property="category"/>
+        <result column="attribution"      property="attribution"/>
         <result column="measurement_unit" property="measurementUnit"/>
         <result column="equivalent_value" property="equivalentValue"/>
         <result column="equal_value"      property="equalValue"/>
@@ -25,7 +26,7 @@
     </resultMap>
 
     <sql id="Base_Column_List">
-        id, name, category, measurement_unit, equivalent_value, equal_value,
+        id, name, category, attribution, measurement_unit, equivalent_value, equal_value,
         low_heat_value, carbon_content, oxidation_rate, color, is_active, sort_order, remark,
         create_by, create_time, update_by, update_time, deleted
     </sql>
@@ -61,11 +62,11 @@
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO bs_energy_catalog (
-            name, category, measurement_unit, equivalent_value, equal_value,
+            name, category, attribution, measurement_unit, equivalent_value, equal_value,
             low_heat_value, carbon_content, oxidation_rate, color, is_active, sort_order, remark,
             create_by, create_time, update_by, update_time, deleted
         ) VALUES (
-            #{name}, #{category}, #{measurementUnit}, #{equivalentValue}, #{equalValue},
+            #{name}, #{category}, #{attribution}, #{measurementUnit}, #{equivalentValue}, #{equalValue},
             #{lowHeatValue}, #{carbonContent}, #{oxidationRate}, #{color}, #{isActive}, #{sortOrder}, #{remark},
             #{createBy}, NOW(), #{updateBy}, NOW(), 0
         )
@@ -78,6 +79,7 @@
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="name != null">name = #{name},</if>
             <if test="category != null">category = #{category},</if>
+            <if test="attribution != null">attribution = #{attribution},</if>
             <if test="measurementUnit != null">measurement_unit = #{measurementUnit},</if>
             <if test="equivalentValue != null">equivalent_value = #{equivalentValue},</if>
             <if test="equalValue != null">equal_value = #{equalValue},</if>
