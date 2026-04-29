@@ -572,6 +572,7 @@ CREATE TABLE `de_tech_indicator` (
     `enterprise_id`             BIGINT        NOT NULL                COMMENT '企业ID -> ent_enterprise.id',
     `audit_year`                INT           NOT NULL                COMMENT '审计年度',
     `indicator_year`            INT           NOT NULL                COMMENT '指标年份(审计年/上年度)',
+    `row_seq`                   INT           DEFAULT NULL            COMMENT '模板行序号',
     `gross_output`              DECIMAL(18,4) DEFAULT NULL            COMMENT '工业总产值(万元)',
     `sales_revenue`             DECIMAL(18,4) DEFAULT NULL            COMMENT '销售收入(万元)',
     `tax_paid`                  DECIMAL(18,4) DEFAULT NULL            COMMENT '上缴利税(万元)',
@@ -602,7 +603,7 @@ CREATE TABLE `de_tech_indicator` (
     `update_time`               DATETIME      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `deleted`                   TINYINT       DEFAULT 0               COMMENT '逻辑删除(0未删除 1已删除)',
     PRIMARY KEY (`id`),
-    UNIQUE INDEX `uk_enterprise_year_indicator` (`enterprise_id`, `audit_year`, `indicator_year`)
+    KEY `idx_enterprise_year_indicator` (`enterprise_id`, `audit_year`, `indicator_year`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='主要技术指标';
 
 -- ----------------------------
