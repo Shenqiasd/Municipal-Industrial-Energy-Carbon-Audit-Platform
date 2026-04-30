@@ -102,6 +102,7 @@ public class EnterpriseSettingController {
     @GetMapping("/config-prefill-data")
     public R<Map<String, Object>> getConfigPrefillData() {
         BsEnergy energyQuery = new BsEnergy();
+        energyQuery.setIsActive(1);
         List<BsEnergy> energies = energySettingService.list(energyQuery);
 
         BsProduct productQuery = new BsProduct();
