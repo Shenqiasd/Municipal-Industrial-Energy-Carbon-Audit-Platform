@@ -77,6 +77,8 @@ public class SpreadsheetDataExtractor {
                         value = extractFromNamedRange(sheets, sheetNameList, namedRanges.get(tagName), mapping.getSheetName());
                     } else if (cellTags.containsKey(tagName)) {
                         value = extractCellValue(cellTags.get(tagName));
+                    } else if (mapping.getCellRange() != null && !mapping.getCellRange().isBlank()) {
+                        value = extractFromCellRange(sheets, sheetNameList, mapping);
                     }
 
                     value = convertType(value, mapping.getDataType());
@@ -86,7 +88,7 @@ public class SpreadsheetDataExtractor {
                         throw new BusinessException("必填字段 [" + mapping.getFieldName() + "] 未填写");
                     }
 
-                    result.put(mapping.getFieldName(), value);
+                    putExtractedValue(result, mapping.getFieldName(), value);
                     log.debug("Extracted SCALAR: {} tag: {} value: {}", mapping.getFieldName(), tagName, value);
                 }
             }
@@ -515,6 +517,27 @@ public class SpreadsheetDataExtractor {
                 .path("data").path("dataTable")
                 .path(String.valueOf(row)).path(String.valueOf(col));
         return extractCellValue(cellNode);
+    }
+
+    private Object extractFromCellRange(JsonNode sheets, List<String> sheetNameList, TplTagMapping mapping) {
+        int[] parsed = parseCellRange(mapping.getCellRange());
+        int sheetIdx = mapping.getSheetIndex() != null ? mapping.getSheetIndex() : 0;
+        String sheetName = resolveSheetName(sheets, sheetNameList, mapping.getSheetName(), sheetIdx);
+        if (sheetName == null) {
+            log.warn("extractFromCellRange: cannot resolve sheet (sheetName={}, sheetIndex={})",
+                    mapping.getSheetName(), sheetIdx);
+            return null;
+        }
+        JsonNode cellNode = sheets.get(sheetName)
+                .path("data").path("dataTable")
+                .path(String.valueOf(parsed[0])).path(String.valueOf(parsed[1]));
+        return extractCellValue(cellNode);
+    }
+
+    private void putExtractedValue(Map<String, Object> result, String fieldName, Object value) {
+        if (value != null || !result.containsKey(fieldName)) {
+            result.put(fieldName, value);
+        }
     }
 
     private Object extractCellValue(JsonNode cellNode) {
