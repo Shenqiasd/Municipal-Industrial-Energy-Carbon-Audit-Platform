@@ -117,6 +117,40 @@ CALL ensure_index('de_tech_indicator', 'idx_enterprise_year_indicator',
 CALL ensure_index('de_tech_indicator', 'idx_submission_row_seq',
     '(submission_id, row_seq)');
 
+-- Sheet 2: 企业概况字段（0428 核对页补齐 0412 覆盖字段）。
+CALL ensure_column('ent_enterprise_setting', 'energy_audit_contact_name',
+    'VARCHAR(50) DEFAULT NULL COMMENT ''能源审计联系人姓名''');
+CALL ensure_column('ent_enterprise_setting', 'energy_audit_contact_phone',
+    'VARCHAR(30) DEFAULT NULL COMMENT ''能源审计联系人电话''');
+
+UPDATE tpl_template_version
+SET template_json = JSON_SET(
+    template_json,
+    '$.sheets."2.企概".data.dataTable."1"."3".tag',  'S2_industry_field',
+    '$.sheets."2.企概".data.dataTable."2"."1".tag',  'S2_enterprise_name',
+    '$.sheets."2.企概".data.dataTable."2"."5".tag',  'S2_credit_code',
+    '$.sheets."2.企概".data.dataTable."3"."5".tag',  'S2_group_name',
+    '$.sheets."2.企概".data.dataTable."8"."1".tag',  'S2_energy_mgmt_org',
+    '$.sheets."2.企概".data.dataTable."8"."5".tag',  'S2_has_energy_center',
+    '$.sheets."2.企概".data.dataTable."9"."1".tag',  'S2_energy_leader_name',
+    '$.sheets."2.企概".data.dataTable."9"."5".tag',  'S2_energy_leader_phone'
+)
+WHERE id = (
+    SELECT id FROM (
+        SELECT v.id
+        FROM tpl_template_version v
+        JOIN tpl_template t ON t.id = v.template_id
+        WHERE t.template_code = 'Energy_Audit_0428'
+          AND v.version = 1
+          AND v.deleted = 0
+          AND t.deleted = 0
+        ORDER BY v.id
+        LIMIT 1
+    ) target_version
+)
+  AND JSON_VALID(template_json)
+  AND JSON_CONTAINS_PATH(template_json, 'one', '$.sheets."2.企概"');
+
 -- Sheet 6: 能源管理制度历史 schema 兼容。
 CALL ensure_column('de_management_policy', 'supervise_dept',
     'VARCHAR(128) DEFAULT NULL COMMENT ''主管部门'' AFTER main_content');
@@ -288,19 +322,52 @@ FROM (
            '[{"col":0,"field":"seq_no","label":"序号","type":"NUMBER"},{"col":1,"field":"project_name","label":"项目名称","type":"STRING"},{"col":2,"field":"project_type","label":"项目类型","type":"STRING"},{"col":3,"field":"main_content","label":"主要内容","type":"STRING"},{"col":4,"field":"investment","label":"投资（万）","type":"NUMBER"},{"col":5,"field":"designed_saving","label":"年节能量（吨标煤）","type":"NUMBER"},{"col":6,"field":"payback_period","label":"投资回收期（年）","type":"NUMBER"},{"col":7,"field":"completion_date","label":"完成时间","type":"STRING"},{"col":8,"field":"actual_saving","label":"实际节能量（吨标煤）","type":"NUMBER"},{"col":9,"field":"is_contract_energy","label":"是否合同能源管理模式","type":"STRING"},{"col":10,"field":"remark","label":"备注","type":"STRING"}]' column_mappings,
            'Sheet 1 实际模板包含方案外的实际节能量/合同能源管理/备注 3 列' remark
     UNION ALL
+    -- Sheet 2: 企业概况 SCALAR（0428 为只读核对页；用单格 cell_range 支持无 cell tag 时预填/抽取）
+    SELECT 'region','region','ent_enterprise_setting','STRING',2,'2.企概','B4','SCALAR','CELL_RANGE',NULL,NULL,NULL,'B4:所属区县/集团'
+    UNION ALL SELECT 'industry_code','industryCode','ent_enterprise_setting','STRING',2,'2.企概','D4','SCALAR','CELL_RANGE',NULL,NULL,NULL,'D4:行业代码'
+    UNION ALL SELECT 'industry_category','industryCategory','ent_enterprise_setting','STRING',2,'2.企概','E4','SCALAR','CELL_RANGE',NULL,NULL,NULL,'E4:行业分类名称'
+    UNION ALL SELECT 'unit_nature','unitNature','ent_enterprise_setting','STRING',2,'2.企概','G4','SCALAR','CELL_RANGE',NULL,NULL,NULL,'G4:单位类型'
+    UNION ALL SELECT 'registered_date','registeredDate','ent_enterprise_setting','DATE',2,'2.企概','B5','SCALAR','CELL_RANGE',NULL,NULL,NULL,'B5:单位注册日期'
+    UNION ALL SELECT 'registered_capital','registeredCapital','ent_enterprise_setting','NUMBER',2,'2.企概','F5','SCALAR','CELL_RANGE',NULL,NULL,NULL,'F5:单位注册资本（万元）'
+    UNION ALL SELECT 'enterprise_address','enterpriseAddress','ent_enterprise_setting','STRING',2,'2.企概','B6','SCALAR','CELL_RANGE',NULL,NULL,NULL,'B6:单位地址'
+    UNION ALL SELECT 'postal_code','postalCode','ent_enterprise_setting','STRING',2,'2.企概','F6','SCALAR','CELL_RANGE',NULL,NULL,NULL,'F6:邮政编码'
+    UNION ALL SELECT 'enterprise_email','enterpriseEmail','ent_enterprise_setting','STRING',2,'2.企概','B7','SCALAR','CELL_RANGE',NULL,NULL,NULL,'B7:电子邮箱'
+    UNION ALL SELECT 'fax','fax','ent_enterprise_setting','STRING',2,'2.企概','F7','SCALAR','CELL_RANGE',NULL,NULL,NULL,'F7:传真（区号）'
+    UNION ALL SELECT 'legal_representative','legalRepresentative','ent_enterprise_setting','STRING',2,'2.企概','B8','SCALAR','CELL_RANGE',NULL,NULL,NULL,'B8:法定代表人姓名'
+    UNION ALL SELECT 'legal_phone','legalPhone','ent_enterprise_setting','STRING',2,'2.企概','F8','SCALAR','CELL_RANGE',NULL,NULL,NULL,'F8:联系电话'
+    UNION ALL SELECT 'S2_industry_field','industryField','ent_enterprise_setting','STRING',2,'2.企概','D2','SCALAR','CELL_RANGE',NULL,NULL,NULL,'沿用 0412 tag：所属领域（如模板含 cell tag 则抽取）'
+    UNION ALL SELECT 'S2_enterprise_name','enterpriseName','ent_enterprise_setting','STRING',2,'2.企概','B3','SCALAR','CELL_RANGE',NULL,NULL,NULL,'B3:单位名称，兼容企业设置预填'
+    UNION ALL SELECT 'S2_credit_code','creditCode','ent_enterprise_setting','STRING',2,'2.企概','F3','SCALAR','CELL_RANGE',NULL,NULL,NULL,'F3:统一社会信用代码，兼容企业设置预填'
+    UNION ALL SELECT 'S2_group_name','groupName','ent_enterprise_setting','STRING',2,'2.企概','F4','SCALAR','CELL_RANGE',NULL,NULL,NULL,'F4/F6:所属集团名称，保留 0412 tag 语义'
+    UNION ALL SELECT 'S2_energy_mgmt_org','energyMgmtOrg','ent_enterprise_setting','STRING',2,'2.企概','B9','SCALAR','CELL_RANGE',NULL,NULL,NULL,'B9:能源管理机构名称'
+    UNION ALL SELECT 'S2_has_energy_center','hasEnergyCenter','ent_enterprise_setting','NUMBER',2,'2.企概','F9','SCALAR','CELL_RANGE',NULL,NULL,NULL,'F9:是否建设能碳管理中心'
+    UNION ALL SELECT 'S2_energy_leader_name','energyLeaderName','ent_enterprise_setting','STRING',2,'2.企概','B10','SCALAR','CELL_RANGE',NULL,NULL,NULL,'B10:单位主管节能领导姓名'
+    UNION ALL SELECT 'S2_energy_leader_phone','energyLeaderPhone','ent_enterprise_setting','STRING',2,'2.企概','F10','SCALAR','CELL_RANGE',NULL,NULL,NULL,'F10:单位主管节能领导电话'
+    UNION ALL SELECT 'energy_manager_name','energyManagerName','ent_enterprise_setting','STRING',2,'2.企概','B11','SCALAR','CELL_RANGE',NULL,NULL,NULL,'B11:能源管理负责人姓名'
+    UNION ALL SELECT 'energy_manager_mobile','energyManagerMobile','ent_enterprise_setting','STRING',2,'2.企概','F11','SCALAR','CELL_RANGE',NULL,NULL,NULL,'F11:能源管理负责人电话'
+    UNION ALL SELECT 'energy_audit_contact_name','energyAuditContactName','ent_enterprise_setting','STRING',2,'2.企概','B12','SCALAR','CELL_RANGE',NULL,NULL,NULL,'B12:能源审计联系人姓名'
+    UNION ALL SELECT 'energy_audit_contact_phone','energyAuditContactPhone','ent_enterprise_setting','STRING',2,'2.企概','F12','SCALAR','CELL_RANGE',NULL,NULL,NULL,'F12:能源审计联系人电话'
+    UNION ALL SELECT 'compiler_name','compilerName','ent_enterprise_setting','STRING',2,'2.企概','B13','SCALAR','CELL_RANGE',NULL,NULL,NULL,'B13:能源审计报告编制单位'
+    UNION ALL SELECT 'compiler_contact','compilerContact','ent_enterprise_setting','STRING',2,'2.企概','F13','SCALAR','CELL_RANGE',NULL,NULL,NULL,'F13:编制单位联系人姓名'
+    UNION ALL SELECT 'compiler_mobile','compilerMobile','ent_enterprise_setting','STRING',2,'2.企概','B14','SCALAR','CELL_RANGE',NULL,NULL,NULL,'B14:编制单位联系人电话'
+    UNION ALL SELECT 'compiler_email','compilerEmail','ent_enterprise_setting','STRING',2,'2.企概','F14','SCALAR','CELL_RANGE',NULL,NULL,NULL,'F14:编制单位联系人邮箱'
+    UNION ALL SELECT 'energy_cert','energyCert','ent_enterprise_setting','NUMBER',2,'2.企概','B15','SCALAR','CELL_RANGE',NULL,NULL,NULL,'B15:是否通过能源管理体系认证'
+    UNION ALL SELECT 'cert_pass_date','certPassDate','ent_enterprise_setting','DATE',2,'2.企概','D15','SCALAR','CELL_RANGE',NULL,NULL,NULL,'D15:认证通过日期'
+    UNION ALL SELECT 'cert_authority','certAuthority','ent_enterprise_setting','STRING',2,'2.企概','F15','SCALAR','CELL_RANGE',NULL,NULL,NULL,'F15:认证机构'
+    UNION ALL
     -- Sheet 3: 企业基础信息 SCALAR（存企业设置，匹配现有双向同步）
-    SELECT 'UNIT_NAME','enterpriseName','ent_enterprise_setting','STRING',3,'3.主要技术指标',NULL,'SCALAR','CELL_TAG',NULL,NULL,NULL,'B3:单位名称（如模板含 cell tag 则抽取）'
-    UNION ALL SELECT 'LEGAL_CODE','creditCode','ent_enterprise_setting','STRING',3,'3.主要技术指标',NULL,'SCALAR','CELL_TAG',NULL,NULL,NULL,'C4:统一社会信用代码/法人代码'
-    UNION ALL SELECT 'ENERGY_LEADER','energyLeaderName','ent_enterprise_setting','STRING',3,'3.主要技术指标',NULL,'SCALAR','CELL_TAG',NULL,NULL,NULL,'B5:单位主管节能领导姓名/职务'
-    UNION ALL SELECT 'ENERGY_DEPT','energyDeptName','ent_enterprise_setting','STRING',3,'3.主要技术指标',NULL,'SCALAR','CELL_TAG',NULL,NULL,NULL,'B6:节能主管部门名称'
-    UNION ALL SELECT 'DEPT_LEADER','energyManagerName','ent_enterprise_setting','STRING',3,'3.主要技术指标',NULL,'SCALAR','CELL_TAG',NULL,NULL,NULL,'B7:能源管理负责人姓名'
-    UNION ALL SELECT 'FULL_TIME_MGR','fulltimeStaffCount','de_company_overview','NUMBER',3,'3.主要技术指标',NULL,'SCALAR','CELL_TAG',NULL,NULL,NULL,'B8:专职管理人数'
-    UNION ALL SELECT 'PART_TIME_MGR','parttimeStaffCount','de_company_overview','NUMBER',3,'3.主要技术指标',NULL,'SCALAR','CELL_TAG',NULL,NULL,NULL,'B9:兼职管理人数'
-    UNION ALL SELECT 'TARGET_NAME','fiveYearTargetName','de_company_overview','STRING',3,'3.主要技术指标',NULL,'SCALAR','CELL_TAG',NULL,NULL,NULL,'B10:十五五节能目标名称'
-    UNION ALL SELECT 'TARGET_VALUE','fiveYearTargetValue','de_company_overview','NUMBER',3,'3.主要技术指标',NULL,'SCALAR','CELL_TAG',NULL,NULL,NULL,'B11:十五五节能目标值'
-    UNION ALL SELECT 'TARGET_DEPT','fiveYearTargetDept','de_company_overview','STRING',3,'3.主要技术指标',NULL,'SCALAR','CELL_TAG',NULL,NULL,NULL,'B12:目标下达部门'
+    SELECT 'UNIT_NAME','enterpriseName','ent_enterprise_setting','STRING',3,'3.主技指','C3','SCALAR','CELL_RANGE',NULL,NULL,NULL,'B3:单位名称（如模板含 cell tag 则抽取）'
+    UNION ALL SELECT 'LEGAL_CODE','creditCode','ent_enterprise_setting','STRING',3,'3.主技指','C4','SCALAR','CELL_RANGE',NULL,NULL,NULL,'C4:统一社会信用代码/法人代码'
+    UNION ALL SELECT 'ENERGY_LEADER','energyLeaderName','ent_enterprise_setting','STRING',3,'3.主技指','C5','SCALAR','CELL_RANGE',NULL,NULL,NULL,'B5:单位主管节能领导姓名/职务'
+    UNION ALL SELECT 'ENERGY_DEPT','energyDeptName','ent_enterprise_setting','STRING',3,'3.主技指','C6','SCALAR','CELL_RANGE',NULL,NULL,NULL,'B6:节能主管部门名称'
+    UNION ALL SELECT 'DEPT_LEADER','energyManagerName','ent_enterprise_setting','STRING',3,'3.主技指','C7','SCALAR','CELL_RANGE',NULL,NULL,NULL,'B7:能源管理负责人姓名'
+    UNION ALL SELECT 'FULL_TIME_MGR','fulltimeStaffCount','de_company_overview','NUMBER',3,'3.主技指','C8','SCALAR','CELL_RANGE',NULL,NULL,NULL,'B8:专职管理人数'
+    UNION ALL SELECT 'PART_TIME_MGR','parttimeStaffCount','de_company_overview','NUMBER',3,'3.主技指','C9','SCALAR','CELL_RANGE',NULL,NULL,NULL,'B9:兼职管理人数'
+    UNION ALL SELECT 'TARGET_NAME','fiveYearTargetName','de_company_overview','STRING',3,'3.主技指','C10','SCALAR','CELL_RANGE',NULL,NULL,NULL,'B10:十五五节能目标名称'
+    UNION ALL SELECT 'TARGET_VALUE','fiveYearTargetValue','de_company_overview','NUMBER',3,'3.主技指','C11','SCALAR','CELL_RANGE',NULL,NULL,NULL,'B11:十五五节能目标值'
+    UNION ALL SELECT 'TARGET_DEPT','fiveYearTargetDept','de_company_overview','STRING',3,'3.主技指','C12','SCALAR','CELL_RANGE',NULL,NULL,NULL,'B12:目标下达部门'
     -- Sheet 3: 主要技术指标 TABLE（实际 A15:F42）
-    UNION ALL SELECT '表3_技术指标','de_tech_indicator','de_tech_indicator','STRING',3,'3.主要技术指标','A15:F42','TABLE','CELL_RANGE',0,NULL,
+    UNION ALL SELECT '表3_技术指标','de_tech_indicator','de_tech_indicator','STRING',3,'3.主技指','A15:F42','TABLE','CELL_RANGE',0,NULL,
            '[{"col":0,"field":"project_name","label":"项目名称","type":"STRING"},{"col":1,"field":"unit","label":"计量单位","type":"STRING"},{"col":2,"field":"current_year","label":"今年","type":"NUMBER"},{"col":3,"field":"prev_year","label":"去年","type":"NUMBER"},{"col":4,"field":"change_pct","label":"变化率（%）","type":"NUMBER"},{"col":5,"field":"material_adjustment","label":"扣除原材料后","type":"NUMBER"}]',
            '0428 数据区仍为 A15:F42；de_tech_indicator 已放宽唯一索引并记录 row_seq，支持多指标行落库'
     -- Sheet 4
@@ -314,7 +381,7 @@ FROM (
     UNION ALL SELECT '表6_管理制度','de_management_policy','de_management_policy','STRING',6,'6.能源管理制度','A3:G52','TABLE','CELL_RANGE',0,NULL,
            '[{"col":0,"field":"seq_no","label":"序号","type":"NUMBER"},{"col":1,"field":"policy_name","label":"制度名称","type":"STRING"},{"col":2,"field":"main_content","label":"主要内容","type":"STRING"},{"col":3,"field":"supervise_dept","label":"主管部门","type":"STRING"},{"col":4,"field":"publish_date","label":"颁布日期","type":"STRING"},{"col":5,"field":"valid_period","label":"有效期","type":"STRING"},{"col":6,"field":"remark","label":"备注","type":"STRING"}]',NULL
     -- Sheet 8
-    UNION ALL SELECT '表8_设备汇总','de_equipment_summary','de_equipment_summary','STRING',7,'8.重点用能设备汇总管理','A3:L102','TABLE','CELL_RANGE',0,NULL,
+    UNION ALL SELECT '表8_设备汇总','de_equipment_summary','de_equipment_summary','STRING',7,'8.重用设汇管','A3:L102','TABLE','CELL_RANGE',0,NULL,
            '[{"col":0,"field":"seq_no","label":"序号","type":"NUMBER"},{"col":1,"field":"device_name","label":"设备名称","type":"STRING"},{"col":2,"field":"category","label":"分类","type":"STRING"},{"col":3,"field":"model","label":"型号","type":"STRING"},{"col":4,"field":"capacity","label":"容量","type":"STRING"},{"col":5,"field":"quantity","label":"数量","type":"NUMBER"},{"col":6,"field":"device_overview","label":"设备概况","type":"STRING"},{"col":7,"field":"obsolete_update_info","label":"淘汰更新情况","type":"STRING"},{"col":8,"field":"install_location","label":"安装使用场所","type":"STRING"},{"col":9,"field":"annual_runtime_hours","label":"年运行时间（小时）","type":"NUMBER"},{"col":10,"field":"energy_efficiency_level","label":"设备对标情况(能效等级)","type":"STRING"},{"col":11,"field":"remark","label":"备注","type":"STRING"}]',
            '方案缺少实际第11列设备对标情况；已补齐'
     -- Sheet 9
