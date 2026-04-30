@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
 public class SpreadsheetDataExtractor {
 
     private static final Logger log = LoggerFactory.getLogger(SpreadsheetDataExtractor.class);
-    private static final Pattern CELL_RANGE_PATTERN = Pattern.compile("([A-Z]+)(\\d+):([A-Z]+)(\\d+)");
+    private static final Pattern CELL_RANGE_PATTERN = Pattern.compile("([A-Z]+)(\\d+)(?::([A-Z]+)(\\d+))?");
 
     private final ObjectMapper objectMapper;
 
@@ -587,8 +587,8 @@ public class SpreadsheetDataExtractor {
         }
         int startCol = letterToCol(m.group(1));
         int startRow = Integer.parseInt(m.group(2)) - 1;
-        int endCol = letterToCol(m.group(3));
-        int endRow = Integer.parseInt(m.group(4)) - 1;
+        int endCol = m.group(3) == null ? startCol : letterToCol(m.group(3));
+        int endRow = m.group(4) == null ? startRow : Integer.parseInt(m.group(4)) - 1;
         return new int[]{startRow, startCol, endRow, endCol};
     }
 
