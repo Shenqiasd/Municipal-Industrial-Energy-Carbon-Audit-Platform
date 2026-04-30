@@ -93,6 +93,7 @@ export interface GCSpreadSheet {
   getDataValidator(row: number, col: number): GCDataValidator | null
   addRows(row: number, count: number): void
   deleteRows(row: number, count: number): void
+  getSelections(): Array<{ row: number; col: number; rowCount: number; colCount: number }>
   setRowVisible(row: number, visible: boolean): void
   getCustomName(name: string): GCSpreadNameInfo | null
   name(): string
