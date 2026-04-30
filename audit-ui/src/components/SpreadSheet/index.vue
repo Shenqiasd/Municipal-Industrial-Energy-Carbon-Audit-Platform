@@ -259,6 +259,7 @@ async function initWorkbook() {
             cpTrace('bindValidationErrorDialogs.start')
             console.time('[perf] bindValidationErrorDialogs')
             bindValidationErrorDialogs(workbook)
+            bindClipboardPasteValidation(workbook)
             console.timeEnd('[perf] bindValidationErrorDialogs')
             cpTrace('bindValidationErrorDialogs.done')
 
@@ -284,9 +285,11 @@ async function initWorkbook() {
           console.warn('[phase2] failed to load tags / apply features:', e)
           // Still bind validation error dialogs as fallback
           bindValidationErrorDialogs(workbook)
+          bindClipboardPasteValidation(workbook)
         }
       } else {
         bindValidationErrorDialogs(workbook)
+        bindClipboardPasteValidation(workbook)
       }
     } finally {
       // Trigger a single recalculation now that all mutations are done (or
@@ -1038,6 +1041,154 @@ function bindValidationErrorDialogs(
         type: style === 0 ? 'error' : 'warning',
         confirmButtonText: '确定',
       })
+    })
+  }
+}
+
+/**
+ * Convert 0-based column index to letter (0 -> A, 25 -> Z, 26 -> AA)
+ */
+function colIndexToLetter(col: number): string {
+  let result = ''
+  let c = col
+  while (c >= 0) {
+    result = String.fromCharCode((c % 26) + 65) + result
+    c = Math.floor(c / 26) - 1
+  }
+  return result
+}
+
+/**
+ * Snapshot of cell values saved before a paste operation so that invalid
+ * cells can be restored to their original values (instead of cleared).
+ */
+let prePasteSnapshot: Map<string, unknown> | null = null
+
+/**
+ * Bind ClipboardPasting event to save original cell values before paste,
+ * and ClipboardPasted event to validate pasted values against DataValidation
+ * rules. SpreadJS ValidationError only fires for manual keyboard input, NOT
+ * for paste operations. This pair of handlers fills that gap.
+ */
+function bindClipboardPasteValidation(
+  wb: import('@/types/spreadjs').GCSpreadWorkbook,
+) {
+  const Events = window.GC?.Spread?.Sheets?.Events
+  if (!Events?.ClipboardPasted || !Events?.ClipboardPasting) return
+
+  const sheetCount = wb.getSheetCount()
+  for (let i = 0; i < sheetCount; i++) {
+    const sheet = wb.getSheet(i)
+
+    // ── ClipboardPasting: snapshot original values before paste ──────
+    sheet.bind(Events.ClipboardPasting, (_sender: unknown, args: {
+      cellRange: { row: number; col: number; rowCount: number; colCount: number }
+    }) => {
+      const { row, col, rowCount, colCount } = args.cellRange
+      const snapshot = new Map<string, unknown>()
+      for (let r = row; r < row + rowCount; r++) {
+        for (let c = col; c < col + colCount; c++) {
+          snapshot.set(`${r},${c}`, sheet.getValue(r, c))
+        }
+      }
+      prePasteSnapshot = snapshot
+    })
+
+    // ── ClipboardPasted: validate pasted values ─────────────────────
+    sheet.bind(Events.ClipboardPasted, (_sender: unknown, args: {
+      cellRange: { row: number; col: number; rowCount: number; colCount: number }
+    }) => {
+      const { row, col, rowCount, colCount } = args.cellRange
+      const snapshot = prePasteSnapshot
+      prePasteSnapshot = null
+
+      const invalidCells: Array<{ row: number; col: number; value: unknown; message: string }> = []
+
+      for (let r = row; r < row + rowCount; r++) {
+        for (let c = col; c < col + colCount; c++) {
+          const dv = (sheet as unknown as {
+            getDataValidator?: (r: number, c: number) => {
+              isValid?: (val: unknown, r: number, c: number) => boolean
+              formula1?: () => string
+              errorStyle?: () => number
+            } | null
+          }).getDataValidator?.(r, c)
+          if (!dv) continue
+
+          const value = sheet.getValue(r, c)
+          if (value == null || value === '') continue
+
+          let isValid = true
+          try {
+            if (typeof dv.isValid === 'function') {
+              isValid = dv.isValid(value, r, c)
+            }
+          } catch {
+            // Fallback: check against formula1 list
+            try {
+              const formula = dv.formula1?.()
+              if (formula) {
+                // Skip range-reference based validators (e.g. "=$A$1:$A$10")
+                if (formula.startsWith('=')) continue
+                const allowedValues = formula.split(',').map((v: string) => v.trim())
+                isValid = allowedValues.includes(String(value))
+              }
+            } catch { /* ignore */ }
+          }
+
+          if (!isValid) {
+            invalidCells.push({
+              row: r,
+              col: c,
+              value,
+              message: `单元格 ${colIndexToLetter(c)}${r + 1} 的值 "${value}" 不在允许的范围内`,
+            })
+          }
+        }
+      }
+
+      if (invalidCells.length === 0) return
+
+      // Determine error style from first invalid cell's validator
+      const firstDv = (sheet as unknown as {
+        getDataValidator?: (r: number, c: number) => { errorStyle?: () => number } | null
+      }).getDataValidator?.(invalidCells[0].row, invalidCells[0].col)
+      let errorStyle: number | undefined
+      try {
+        errorStyle = firstDv?.errorStyle?.()
+      } catch { /* ignore */ }
+
+      const isStopStyle = errorStyle === 0
+
+      // Build error message
+      const maxShow = 5
+      const messages = invalidCells.slice(0, maxShow).map(c => c.message)
+      if (invalidCells.length > maxShow) {
+        messages.push(`...还有 ${invalidCells.length - maxShow} 个单元格`)
+      }
+
+      if (isStopStyle) {
+        // Revert pasted values — restore originals from snapshot
+        suspendEventSafe(wb)
+        for (const cell of invalidCells) {
+          const original = snapshot?.get(`${cell.row},${cell.col}`)
+          sheet.setValue(cell.row, cell.col, original ?? '')
+        }
+        resumeEventSafe(wb)
+
+        ElMessageBox.alert(
+          messages.join('\n'),
+          '粘贴内容校验失败',
+          { type: 'error', confirmButtonText: '确定' },
+        )
+      } else {
+        // Warning style — keep values but show warning
+        ElMessageBox.alert(
+          messages.join('\n'),
+          '粘贴内容校验警告',
+          { type: 'warning', confirmButtonText: '确定' },
+        )
+      }
     })
   }
 }
