@@ -1158,7 +1158,7 @@ function bindClipboardPasteValidation(
         errorStyle = firstDv?.errorStyle?.()
       } catch { /* ignore */ }
 
-      const isStopStyle = errorStyle === 0
+      const isStopStyle = (errorStyle ?? 0) === 0
 
       // Build error message
       const maxShow = 5
@@ -1172,7 +1172,7 @@ function bindClipboardPasteValidation(
         suspendEventSafe(wb)
         for (const cell of invalidCells) {
           const original = snapshot?.get(`${cell.row},${cell.col}`)
-          sheet.setValue(cell.row, cell.col, original ?? '')
+          sheet.setValue(cell.row, cell.col, original ?? null)
         }
         resumeEventSafe(wb)
 
