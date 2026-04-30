@@ -72,7 +72,7 @@ function progressText(sheet: SheetFillStatus): string {
         </span>
         <template v-if="!collapsed">
           <div class="sheet-nav__info">
-            <span class="sheet-nav__name">{{ sheet.sheetName }}</span>
+            <span class="sheet-nav__name" :title="sheet.sheetName">{{ sheet.sheetName }}</span>
             <span class="sheet-nav__progress">{{ progressText(sheet) }}</span>
           </div>
         </template>

@@ -90,6 +90,7 @@ export interface GCSpreadSheet {
   getCell(row: number, col: number): GCCellRange
   getRange(row: number, col: number, rowCount: number, colCount: number): GCRange
   setDataValidator(row: number, col: number, validator: GCDataValidator): void
+  getDataValidator(row: number, col: number): GCDataValidator | null
   setRowVisible(row: number, visible: boolean): void
   getCustomName(name: string): GCSpreadNameInfo | null
   name(): string
@@ -172,6 +173,8 @@ export interface GCSpreadSheetsEvents {
   ActiveSheetChanged: string
   CellChanged: string
   ViewZoomed: string
+  ClipboardPasting?: string
+  ClipboardPasted?: string
 }
 
 export interface GCSpreadSheets {
