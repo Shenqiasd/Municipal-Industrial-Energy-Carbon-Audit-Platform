@@ -866,6 +866,13 @@ function fillTaggedCell(
     }
   }
 
+  const rangeTarget = resolveSingleCellRange(wb, tag)
+  if (rangeTarget) {
+    const sheet = wb.getSheet(rangeTarget.sheetIndex)
+    sheet.setValue(rangeTarget.row, rangeTarget.col, value)
+    return true
+  }
+
   return false
 }
 
@@ -1191,6 +1198,15 @@ function unlockScalarCell(
       return
     }
   }
+
+  const rangeTarget = resolveSingleCellRange(wb, tag)
+  if (rangeTarget) {
+    const sheet = wb.getSheet(rangeTarget.sheetIndex)
+    const cell = sheet.getCell(rangeTarget.row, rangeTarget.col)
+    cell.locked(false)
+    if (tag.required === 1) markCellRequired(cell, hint)
+    return
+  }
   console.warn(
     `[protection] SCALAR tag 未找到匹配单元格: ${tag.tagName}`,
     `(source=${tag.sourceType}, sheet=${tag.sheetName ?? tag.sheetIndex})`,
@@ -1429,6 +1445,13 @@ function isScalarCellEmpty(
       return val == null || val === ''
     }
   }
+
+  const rangeTarget = resolveSingleCellRange(wb, tag)
+  if (rangeTarget) {
+    const sheet = wb.getSheet(rangeTarget.sheetIndex)
+    const val = sheet.getValue(rangeTarget.row, rangeTarget.col)
+    return val == null || val === ''
+  }
   return true // if we can't find the cell, treat as empty
 }
 
@@ -1487,6 +1510,32 @@ function findSheet(
   if (idx >= 0 && idx < count) return wb.getSheet(idx)
   console.warn(`[protection] findSheet 失败: name=${sheetName}, index=${sheetIndex}, sheetCount=${count}`)
   return null
+}
+
+function resolveSingleCellRange(
+  wb: import('@/types/spreadjs').GCSpreadWorkbook,
+  tag: TplTagMapping,
+): { sheetIndex: number; row: number; col: number } | null {
+  if (!tag.cellRange) return null
+  const rangeMatch = tag.cellRange.toUpperCase().trim().match(/^([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$/)
+  if (!rangeMatch) return null
+  const row = parseInt(rangeMatch[2]) - 1
+  const col = letterToColIndex(rangeMatch[1])
+  const endRow = rangeMatch[4] ? parseInt(rangeMatch[4]) - 1 : row
+  const endCol = rangeMatch[3] ? letterToColIndex(rangeMatch[3]) : col
+  if (row !== endRow || col !== endCol) return null
+
+  const sheet = findSheet(wb, tag.sheetName, tag.sheetIndex)
+  if (!sheet) return null
+  let sheetIndex = tag.sheetIndex ?? 0
+  const count = wb.getSheetCount()
+  for (let i = 0; i < count; i++) {
+    if (wb.getSheet(i) === sheet) {
+      sheetIndex = i
+      break
+    }
+  }
+  return { sheetIndex, row, col }
 }
 
 function letterToColIndex(letters: string): number {
