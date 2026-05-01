@@ -367,6 +367,12 @@ public class ReportServiceImpl implements ReportService {
         ArReport existing = reportMapper.selectByEnterpriseAndYear(enterpriseId, auditYear, rt);
         if (existing != null && existing.getStatus() != null) {
             int s = existing.getStatus();
+            // status=1 means a legacy SpreadJS-generation pipeline is still mid-flight on this row;
+            // overwriting the uploaded_* columns now would race that thread and likely truncate
+            // its result. Block it the same way we block 4 / 5.
+            if (s == 1) {
+                throw new BusinessException("该年度报告正在生成中，请稍后再重新上传");
+            }
             if (s == 4) {
                 throw new BusinessException("该年度报告已提交审核，等待审核结果后再重新上传");
             }
@@ -407,10 +413,19 @@ public class ReportServiceImpl implements ReportService {
                 reportMapper.insert(record);
             } catch (org.springframework.dao.DuplicateKeyException dup) {
                 // Another concurrent upload won the race against the
-                // uk_ar_report_ent_year_type unique index — translate into a
-                // friendly retry message instead of a 500.
+                // uk_ar_report_ent_year_type unique index. We've already saved
+                // our payload to the file store at newKey above; the row that
+                // ends up authoritative belongs to the winner, so newKey would
+                // be a leaked orphan on disk. Best-effort delete it before we
+                // surface the friendly retry message.
                 log.warn("[ReportService] Concurrent upload conflict for enterprise={} year={} type={}",
                     enterpriseId, auditYear, rt);
+                try {
+                    reportFileStore.delete(newKey);
+                } catch (RuntimeException cleanup) {
+                    log.warn("[ReportService] Failed to clean up orphaned upload file {} after conflict: {}",
+                        newKey, cleanup.getMessage());
+                }
                 throw new BusinessException("该年度报告正在被同时上传，请稍后重试");
             }
             reportId = record.getId();

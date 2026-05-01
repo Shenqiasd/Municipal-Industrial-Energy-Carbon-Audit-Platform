@@ -10,6 +10,7 @@ import com.energy.audit.service.report.ReportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +29,9 @@ public class ReportController {
 
     @Autowired
     private ReportService reportService;
+
+    @Value("${app.report.max-upload-size-mb:50}")
+    private int maxUploadSizeMb;
 
     private void requireEnterprise() {
         Integer userType = SecurityUtils.getCurrentUserType();
@@ -189,6 +193,15 @@ public class ReportController {
         requireEnterprise();
         if (file == null || file.isEmpty()) {
             return R.fail("请选择要上传的文件");
+        }
+        // Pre-check the multipart's reported size before calling getBytes(), which materializes
+        // the entire upload into a JVM byte[]. Without this, a malicious / oversized request can
+        // burn (concurrent uploads * file.getSize()) bytes of heap before the service-layer size
+        // check fires. Spring's spring.servlet.multipart.max-file-size is the framework-level
+        // backstop; this is a defense-in-depth that reuses the same threshold the service uses.
+        long maxBytes = (long) maxUploadSizeMb * 1024L * 1024L;
+        if (file.getSize() > maxBytes) {
+            return R.fail("文件大小超过限制（" + maxUploadSizeMb + " MB）");
         }
         Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
         String username = SecurityUtils.getCurrentUsername();
