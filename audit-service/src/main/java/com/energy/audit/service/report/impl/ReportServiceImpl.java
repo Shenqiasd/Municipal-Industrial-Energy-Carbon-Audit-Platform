@@ -443,11 +443,9 @@ public class ReportServiceImpl implements ReportService {
                 report.getUploadedFileName(),
                 blob);
             if (newKey != null && !newKey.equals(report.getUploadedFilePath())) {
-                ArReport patch = new ArReport();
-                patch.setId(reportId);
-                patch.setUploadedFilePath(newKey);
-                patch.setUpdateBy("system");
-                reportMapper.update(patch);
+                // Targeted update — must NOT use reportMapper.update(patch), which would
+                // unconditionally set review_comment = NULL and erase any auditor's rejection reason.
+                reportMapper.updateUploadedFilePathById(reportId, newKey, "system");
                 log.info("[ReportService] Self-healed local cache for report {} -> {}", reportId, newKey);
             }
             return blob;

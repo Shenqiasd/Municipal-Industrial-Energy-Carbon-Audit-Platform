@@ -65,10 +65,14 @@
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO ar_report (enterprise_id, audit_year, report_name, report_type,
                                status, generated_file_path, generate_time,
+                               uploaded_file_path, uploaded_file_data,
+                               uploaded_file_size, uploaded_file_name, uploaded_at,
                                report_html, template_id, submission_id, flow_chart_path,
                                create_by, update_by)
         VALUES (#{enterpriseId}, #{auditYear}, #{reportName}, #{reportType},
                 #{status}, #{generatedFilePath}, #{generateTime},
+                #{uploadedFilePath}, #{uploadedFileData},
+                #{uploadedFileSize}, #{uploadedFileName}, #{uploadedAt},
                 #{reportHtml}, #{templateId}, #{submissionId}, #{flowChartPath},
                 #{createBy}, #{updateBy})
     </insert>
@@ -122,9 +126,23 @@
         WHERE id = #{id} AND deleted = 0
     </select>
 
+    <!--
+      Targeted update used by the self-heal path in downloadUploadedReportBytes.
+      Avoids the general-purpose <update id="update"> which has an unconditional
+      review_comment = #{reviewComment} clause that would clobber existing comments.
+    -->
+    <update id="updateUploadedFilePathById">
+        UPDATE ar_report
+        SET uploaded_file_path = #{path},
+            update_by          = #{updateBy},
+            update_time        = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND deleted = 0
+    </update>
+
     <select id="selectByEnterprise" resultMap="LightResultMap">
         SELECT r.id, r.enterprise_id, r.audit_year, r.report_name, r.report_type,
                r.status, r.generated_file_path, r.uploaded_file_path,
+               r.uploaded_file_size, r.uploaded_file_name, r.uploaded_at,
                r.generate_time, r.submit_time, r.template_id, r.submission_id,
                r.flow_chart_path, r.review_comment, r.reviewer_id,
                r.create_by, r.create_time, r.update_by, r.update_time, r.deleted,
@@ -157,6 +175,7 @@
     <select id="selectByStatus" resultMap="LightResultMap">
         SELECT r.id, r.enterprise_id, r.audit_year, r.report_name, r.report_type,
                r.status, r.generated_file_path, r.uploaded_file_path,
+               r.uploaded_file_size, r.uploaded_file_name, r.uploaded_at,
                r.generate_time, r.submit_time, r.template_id, r.submission_id,
                r.flow_chart_path, r.review_comment, r.reviewer_id,
                r.create_by, r.create_time, r.update_by, r.update_time, r.deleted,
