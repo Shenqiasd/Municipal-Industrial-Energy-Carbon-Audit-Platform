@@ -373,7 +373,15 @@ public class ReportServiceImpl implements ReportService {
         }
 
         // 1. Write the file bytes to the pluggable store (local fs by default, could be COS later).
+        // Fail loud on storage failure rather than persisting a row whose uploaded_file_path
+        // is null but whose BLOB has the new bytes — that combination would silently serve
+        // the OLD filesystem file on the next download (if the previous path is still
+        // present on disk) because the MyBatis update statement guards uploaded_file_path
+        // with <if test="uploadedFilePath != null">.
         String newKey = reportFileStore.save(enterpriseId, auditYear, fileName, fileBytes);
+        if (newKey == null) {
+            throw new BusinessException("文件保存失败，请稍后重试");
+        }
 
         // 2. Upsert the ar_report row + persist BLOB redundancy in one tx.
         Long reportId;

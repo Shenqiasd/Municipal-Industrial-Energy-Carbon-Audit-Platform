@@ -95,7 +95,7 @@
             <if test="submissionId != null">submission_id = #{submissionId},</if>
             <if test="flowChartPath != null">flow_chart_path = #{flowChartPath},</if>
             review_comment = #{reviewComment},
-            <if test="reviewerId != null">reviewer_id = #{reviewerId},</if>
+            reviewer_id = #{reviewerId},
             update_by = #{updateBy},
             update_time = CURRENT_TIMESTAMP,
         </set>
