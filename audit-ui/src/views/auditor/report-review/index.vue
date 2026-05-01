@@ -25,8 +25,10 @@ const actionLoading = ref(false)
 const detailDialogVisible = ref(false)
 const detailReport = ref<ArReport | null>(null)
 const detailLoading = ref(false)
-const detailDownloading = ref(false)
 
+// Single download-loading state for both the table-row buttons and the
+// detail-dialog button: holds the report id that's currently downloading,
+// or null when no download is in progress.
 const downloadingId = ref<number | null>(null)
 
 // `undefined` sentinels represent "no filter"; they're cast so el-option's
@@ -76,7 +78,7 @@ function formatDate(dt: string | null | undefined) {
 }
 
 function formatBytes(bytes: number | null | undefined): string {
-  if (!bytes || bytes <= 0) return '—'
+  if (bytes == null || bytes <= 0) return '—'
   const units = ['B', 'KB', 'MB', 'GB']
   let v = bytes
   let i = 0
@@ -87,9 +89,13 @@ function formatBytes(bytes: number | null | undefined): string {
   return `${v.toFixed(v >= 100 || i === 0 ? 0 : 1)} ${units[i]}`
 }
 
+// uploadedFilePath is the source of truth for "a file actually exists in
+// the store"; uploadedFileName is just display metadata. Keying the download
+// button off the path avoids surfacing a button that 404s when only the
+// filename column is populated.
 function hasUploadedFile(report: ArReport | null | undefined): boolean {
   if (!report) return false
-  return !!report.uploadedFilePath || !!report.uploadedFileName
+  return !!report.uploadedFilePath
 }
 
 async function openDetail(report: ArReport) {
@@ -177,7 +183,7 @@ async function handleDownload(report: ArReport) {
 
 async function handleDetailDownload() {
   if (!detailReport.value) return
-  detailDownloading.value = true
+  downloadingId.value = detailReport.value.id
   try {
     const blob = await downloadUploadedReport(detailReport.value.id)
     const fallback = (detailReport.value.reportName || `audit-report-${detailReport.value.id}`) + '.docx'
@@ -185,7 +191,7 @@ async function handleDetailDownload() {
   } catch (e: unknown) {
     ElMessage.error('下载失败：' + extractMsg(e))
   } finally {
-    detailDownloading.value = false
+    downloadingId.value = null
   }
 }
 
@@ -360,7 +366,7 @@ onMounted(loadReports)
               v-if="hasUploadedFile(detailReport)"
               type="primary"
               :icon="Download"
-              :loading="detailDownloading"
+              :loading="downloadingId === detailReport?.id"
               @click="handleDetailDownload"
             >下载企业上传的报告（.docx）</el-button>
             <span v-else style="color:#909399; font-size:13px">
