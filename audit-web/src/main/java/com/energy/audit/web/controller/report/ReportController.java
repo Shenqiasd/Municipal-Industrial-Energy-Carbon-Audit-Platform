@@ -144,6 +144,39 @@ public class ReportController {
         return R.ok(reportService.listTemplates());
     }
 
+    // ====== Enterprise-side: download the active report template ======
+
+    @Operation(summary = "Get currently active report template metadata (enterprise users only)")
+    @GetMapping("/template/active")
+    public R<ArReportTemplate> getActiveTemplate() {
+        requireEnterprise();
+        // Returns null when no active template exists — frontend shows disabled state.
+        return R.ok(reportService.getActiveTemplate());
+    }
+
+    @Operation(summary = "Download the active report template (.docx) for enterprise users")
+    @GetMapping("/template/active/download")
+    public ResponseEntity<byte[]> downloadActiveTemplate() {
+        requireEnterprise();
+        ArReportTemplate template = reportService.getActiveTemplate();
+        if (template == null) {
+            throw new BusinessException("未找到可用的报告模板，请联系管理员上传模板");
+        }
+        byte[] bytes = reportService.downloadActiveTemplateBytes();
+        String fileName = template.getOriginalFileName();
+        if (fileName == null || fileName.isEmpty()) {
+            String tplName = template.getTemplateName() != null && !template.getTemplateName().isEmpty()
+                ? template.getTemplateName() : "report-template";
+            fileName = tplName + ".docx";
+        }
+        String encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20");
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename*=UTF-8''" + encodedFileName)
+            .contentType(MediaType.APPLICATION_OCTET_STREAM)
+            .body(bytes);
+    }
+
     // ====== Phase 4: Admin Report Template Management ======
 
     private void requireAdmin() {

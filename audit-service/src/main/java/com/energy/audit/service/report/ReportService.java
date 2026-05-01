@@ -41,6 +41,21 @@ public interface ReportService {
      */
     List<ArReportTemplate> listTemplates();
 
+    /**
+     * Return the currently-active report template metadata, or {@code null} if none.
+     * The returned object's {@code templateFileData} BLOB is intentionally not loaded
+     * here — use {@link #downloadActiveTemplateBytes()} to fetch the actual file bytes.
+     */
+    ArReportTemplate getActiveTemplate();
+
+    /**
+     * Load the bytes of the currently-active report template.
+     * Resolution order: filesystem first (fast cache), DB BLOB on miss.
+     * @throws com.energy.audit.common.exception.BusinessException if no active template exists
+     *         or the template has neither a readable file nor a BLOB on record.
+     */
+    byte[] downloadActiveTemplateBytes();
+
     // ====== Phase 4: Admin Report Template Management ======
 
     /**

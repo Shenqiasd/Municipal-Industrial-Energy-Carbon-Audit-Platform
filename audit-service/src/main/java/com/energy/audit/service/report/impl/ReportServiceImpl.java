@@ -309,6 +309,41 @@ public class ReportServiceImpl implements ReportService {
         return reportTemplateMapper.selectAll();
     }
 
+    @Override
+    public ArReportTemplate getActiveTemplate() {
+        if (reportTemplateMapper == null) {
+            return null;
+        }
+        return reportTemplateMapper.selectActive();
+    }
+
+    @Override
+    public byte[] downloadActiveTemplateBytes() {
+        if (reportTemplateMapper == null) {
+            throw new BusinessException("报告模板模块未初始化");
+        }
+        ArReportTemplate template = reportTemplateMapper.selectActive();
+        if (template == null) {
+            throw new BusinessException("未找到可用的报告模板，请联系管理员上传模板");
+        }
+        // Filesystem first (fast), then DB BLOB (survives container restarts)
+        String fsPath = template.getTemplateFilePath();
+        if (fsPath != null && Files.exists(Paths.get(fsPath))) {
+            try {
+                log.info("[ReportService] Active template served from filesystem: {}", fsPath);
+                return Files.readAllBytes(Paths.get(fsPath));
+            } catch (IOException e) {
+                log.warn("[ReportService] Failed to read template file {}, falling back to DB BLOB", fsPath, e);
+            }
+        }
+        byte[] data = template.getTemplateFileData();
+        if (data != null && data.length > 0) {
+            log.info("[ReportService] Active template served from DB BLOB ({} bytes)", data.length);
+            return data;
+        }
+        throw new BusinessException("报告模板文件不存在且数据库中无模板数据，请重新上传模板");
+    }
+
     // ====== Phase 4: Admin Report Template Management ======
 
     @Override
