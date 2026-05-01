@@ -10,6 +10,7 @@ import com.energy.audit.service.report.ReportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +29,9 @@ public class ReportController {
 
     @Autowired
     private ReportService reportService;
+
+    @Value("${app.report.max-upload-size-mb:50}")
+    private int maxUploadSizeMb;
 
     private void requireEnterprise() {
         Integer userType = SecurityUtils.getCurrentUserType();
@@ -176,6 +180,75 @@ public class ReportController {
                 "attachment; filename*=UTF-8''" + encodedFileName)
             .contentType(MediaType.APPLICATION_OCTET_STREAM)
             .body(download.getBytes());
+    }
+
+    // ====== Enterprise-side: upload + download a filled report ======
+
+    @Operation(summary = "Upload an enterprise-filled .docx report (overwrites the latest copy for that year)")
+    @PostMapping("/upload")
+    public R<ArReport> uploadFilledReport(
+            @RequestPart("file") MultipartFile file,
+            @RequestParam Integer auditYear,
+            @RequestParam(required = false) Integer reportType) {
+        requireEnterprise();
+        if (file == null || file.isEmpty()) {
+            return R.fail("请选择要上传的文件");
+        }
+        // Pre-check the multipart's reported size before calling getBytes(), which materializes
+        // the entire upload into a JVM byte[]. Without this, a malicious / oversized request can
+        // burn (concurrent uploads * file.getSize()) bytes of heap before the service-layer size
+        // check fires. Spring's spring.servlet.multipart.max-file-size is the framework-level
+        // backstop; this is a defense-in-depth that reuses the same threshold the service uses.
+        long maxBytes = (long) maxUploadSizeMb * 1024L * 1024L;
+        if (file.getSize() > maxBytes) {
+            return R.fail("文件大小超过限制（" + maxUploadSizeMb + " MB）");
+        }
+        Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
+        String username = SecurityUtils.getCurrentUsername();
+        try {
+            ArReport report = reportService.uploadFilledReport(
+                enterpriseId, auditYear, reportType,
+                file.getOriginalFilename(), file.getBytes(), username);
+            return R.ok(report);
+        } catch (BusinessException be) {
+            return R.fail(be.getMessage());
+        } catch (java.io.IOException e) {
+            return R.fail("文件读取失败");
+        }
+    }
+
+    @Operation(summary = "Download an enterprise-uploaded report by ID")
+    @GetMapping("/{id}/uploaded/download")
+    public ResponseEntity<byte[]> downloadUploadedReport(@PathVariable Long id) {
+        // Permission: enterprise users may only download their own; auditors/admins any.
+        Integer userType = SecurityUtils.getCurrentUserType();
+        if (userType == null) {
+            throw new BusinessException("请先登录");
+        }
+        ArReport report = reportService.getReport(id);
+        if (report == null) {
+            throw new BusinessException("报告不存在");
+        }
+        if (userType == 3) {
+            Long enterpriseId = SecurityUtils.getRequiredCurrentEnterpriseId();
+            if (!enterpriseId.equals(report.getEnterpriseId())) {
+                throw new BusinessException("无权访问其他企业的报告");
+            }
+        } else if (userType != 1 && userType != 2) {
+            throw new BusinessException("当前用户无权下载报告");
+        }
+
+        byte[] bytes = reportService.downloadUploadedReportBytes(id);
+        String fileName = report.getUploadedFileName();
+        if (fileName == null || fileName.isEmpty()) {
+            fileName = "audit-report-" + id + ".docx";
+        }
+        String encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20");
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename*=UTF-8''" + encodedFileName)
+            .contentType(MediaType.APPLICATION_OCTET_STREAM)
+            .body(bytes);
     }
 
     // ====== Phase 4: Admin Report Template Management ======
