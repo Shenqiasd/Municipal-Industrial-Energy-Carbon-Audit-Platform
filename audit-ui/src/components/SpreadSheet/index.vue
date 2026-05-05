@@ -48,6 +48,8 @@ let workbook: import('@/types/spreadjs').GCSpreadWorkbook | null = null
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null
 let publishedVersion: TplTemplateVersion | null = null
 let currentSubmission: TplSubmission | null = null
+let disposed = false
+let loadSeq = 0
 
 /**
  * ownsLock is initialised from props.hasLock at mount time (before any async work),
@@ -112,6 +114,9 @@ function calculateAllSafe(wb: WB) {
     if (typeof fn === 'function') fn.call(wb, calcType)
   } catch { /* best-effort */ }
 }
+function isLoadStale(loadId: number, wb: WB): boolean {
+  return disposed || loadId !== loadSeq || workbook !== wb
+}
 
 // ── Persistent trace helper for diagnosing main-thread freezes ─────────
 // When Phase 2 mutation hangs the browser, normal console logs are lost
@@ -155,11 +160,14 @@ watch(
 )
 
 onMounted(() => {
+  disposed = false
   ownsLock = props.hasLock
   initWorkbook()
 })
 
 onBeforeUnmount(() => {
+  disposed = true
+  loadSeq++
   stopHeartbeat()
   releaseLockIfOwned()
   window.removeEventListener('resize', onWindowResize)
@@ -169,8 +177,9 @@ onBeforeUnmount(() => {
   }
   if (statusUpdateTimer) clearTimeout(statusUpdateTimer)
   if (resizeTimer) clearTimeout(resizeTimer)
-  workbook?.destroy()
+  const wb = workbook
   workbook = null
+  wb?.destroy()
 })
 
 async function initWorkbook() {
@@ -185,20 +194,24 @@ async function initWorkbook() {
   initSpreadJSLicense()
   loading.value = true
   errorMsg.value = ''
+  const loadId = ++loadSeq
+  let wb: WB | null = null
   try {
-    workbook = new window.GC.Spread.Sheets.Workbook(spreadRef.value)
+    wb = new window.GC.Spread.Sheets.Workbook(spreadRef.value)
+    workbook = wb
 
     // ── Phase 1: fetch template version + submission in parallel ──────
     const [fetchedVersion, fetchedSubmission] = await Promise.all([
       getPublishedVersion(props.templateId),
       getSubmission(props.templateId, props.auditYear),
     ])
+    if (isLoadStale(loadId, wb)) return
     publishedVersion = fetchedVersion
     currentSubmission = fetchedSubmission
 
     if (!publishedVersion?.templateJson) {
       errorMsg.value = '该模板尚未发布有效版本，请联系管理员'
-      workbook.destroy()
+      wb.destroy()
       workbook = null
       releaseLockIfOwned()
       return
@@ -214,11 +227,13 @@ async function initWorkbook() {
     // after all Phase 2 mutations complete, avoiding repeated full-workbook
     // recomputation on templates with heavy cross-sheet formulas.
     console.time('[perf] fromJSON')
-    ;(workbook.fromJSON as unknown as (data: unknown, opts?: Record<string, unknown>) => void)(
+    if (isLoadStale(loadId, wb)) return
+    ;(wb.fromJSON as unknown as (data: unknown, opts?: Record<string, unknown>) => void)(
       jsonObj,
       { doNotRecalculateAfterLoad: true },
     )
     console.timeEnd('[perf] fromJSON')
+    if (isLoadStale(loadId, wb)) return
 
     // ── Phase 2: fetch tags + prefill data in parallel (one listTags call) ─
     // Wrapped in its own try-catch so that a failure in supplementary features
@@ -232,10 +247,11 @@ async function initWorkbook() {
     try {
       if (publishedVersion.id) {
         try {
+          const versionId = publishedVersion.id
           cpTrace('phase2.fetch.start')
           console.time('[perf] phase2-fetch')
           const [tags, prefillData, configPrefillData] = await Promise.all([
-            listTags(publishedVersion.id).catch(e => {
+            listTags(versionId).catch(e => {
               console.warn('[phase2] listTags failed:', e)
               return [] as TplTagMapping[]
             }),
@@ -246,6 +262,7 @@ async function initWorkbook() {
             getConfigPrefillData().catch(() => null),
           ])
           console.timeEnd('[perf] phase2-fetch')
+          if (isLoadStale(loadId, wb)) return
           cpTrace('phase2.fetch.done', { tagCount: tags.length })
 
           // Master suspend envelope for all Phase 2 mutations — prevents the
@@ -254,9 +271,9 @@ async function initWorkbook() {
           // Nested suspend calls inside individual apply* functions are still
           // safe (SpreadJS reference-counts suspend depth).
           console.time('[perf] phase2-mutate')
-          workbook.suspendPaint()
-          suspendEventSafe(workbook)
-          suspendCalcServiceSafe(workbook)
+          wb.suspendPaint()
+          suspendEventSafe(wb)
+          suspendCalcServiceSafe(wb)
           cpTrace('phase2.mutate.suspended')
           try {
             // Build cell-tag index ONCE for O(1) lookups (replaces O(tags ×
@@ -264,7 +281,8 @@ async function initWorkbook() {
             // applyConfigPrefill / applyDataEntryProtection since they all use
             // fillTaggedCell / unlockScalarCell which rely on the index.
             console.time('[perf] buildCellTagIndex')
-            buildCellTagIndex(workbook)
+            if (isLoadStale(loadId, wb)) return
+            buildCellTagIndex(wb)
             console.timeEnd('[perf] buildCellTagIndex')
             cpTrace('buildCellTagIndex.done')
 
@@ -272,7 +290,8 @@ async function initWorkbook() {
             if (!currentSubmission && prefillData) {
               cpTrace('applyPrefill.start')
               console.time('[perf] applyPrefill')
-              applyPrefill(workbook, tags, prefillData)
+              if (isLoadStale(loadId, wb)) return
+              applyPrefill(wb, tags, prefillData)
               console.timeEnd('[perf] applyPrefill')
               cpTrace('applyPrefill.done')
             }
@@ -281,7 +300,8 @@ async function initWorkbook() {
             if (configPrefillData) {
               cpTrace('applyConfigPrefill.start')
               console.time('[perf] applyConfigPrefill')
-              applyConfigPrefill(workbook, tags, configPrefillData)
+              if (isLoadStale(loadId, wb)) return
+              applyConfigPrefill(wb, tags, configPrefillData)
               console.timeEnd('[perf] applyConfigPrefill')
               cpTrace('applyConfigPrefill.done')
             }
@@ -289,15 +309,18 @@ async function initWorkbook() {
             // Inject dictionary-based dropdown validators (uses pre-fetched tags)
             cpTrace('applyDictValidators.start')
             console.time('[perf] applyDictValidators')
-            await applyDictValidators(workbook, tags)
+            if (isLoadStale(loadId, wb)) return
+            await applyDictValidators(wb, tags)
+            if (isLoadStale(loadId, wb)) return
             console.timeEnd('[perf] applyDictValidators')
             cpTrace('applyDictValidators.done')
 
             // Bind ValidationError event on every sheet
             cpTrace('bindValidationErrorDialogs.start')
             console.time('[perf] bindValidationErrorDialogs')
-            bindValidationErrorDialogs(workbook)
-            bindClipboardPasteValidation(workbook)
+            if (isLoadStale(loadId, wb)) return
+            bindValidationErrorDialogs(wb)
+            bindClipboardPasteValidation(wb)
             console.timeEnd('[perf] bindValidationErrorDialogs')
             cpTrace('bindValidationErrorDialogs.done')
 
@@ -309,41 +332,47 @@ async function initWorkbook() {
             if (publishedVersion.protectionEnabled !== 0) {
               cpTrace('applyDataEntryProtection.start')
               console.time('[perf] applyDataEntryProtection')
-              applyDataEntryProtection(workbook, tags)
+              if (isLoadStale(loadId, wb)) return
+              applyDataEntryProtection(wb, tags)
               console.timeEnd('[perf] applyDataEntryProtection')
               cpTrace('applyDataEntryProtection.done')
             }
           } finally {
             cpTrace('phase2.resume.start')
-            resumeCalcServiceSafe(workbook)
+            resumeCalcServiceSafe(wb)
             cpTrace('phase2.resumeCalcService.done')
-            resumeEventSafe(workbook)
+            resumeEventSafe(wb)
             cpTrace('phase2.resumeEvent.done')
-            workbook.resumePaint()
+            wb.resumePaint()
             cpTrace('phase2.resumePaint.done')
             console.timeEnd('[perf] phase2-mutate')
           }
         } catch (e) {
+          if (isLoadStale(loadId, wb)) return
           console.warn('[phase2] failed to load tags / apply features:', e)
           // Still bind validation error dialogs as fallback
-          bindValidationErrorDialogs(workbook)
-          bindClipboardPasteValidation(workbook)
+          bindValidationErrorDialogs(wb)
+          bindClipboardPasteValidation(wb)
         }
       } else {
-        bindValidationErrorDialogs(workbook)
-        bindClipboardPasteValidation(workbook)
+        if (isLoadStale(loadId, wb)) return
+        bindValidationErrorDialogs(wb)
+        bindClipboardPasteValidation(wb)
       }
     } finally {
       // Trigger a single recalculation now that all mutations are done (or
       // skipped / failed) — this MUST run to compensate for the
       // doNotRecalculateAfterLoad flag passed to fromJSON above. Otherwise
       // formula cells would render stale/unevaluated.
-      cpTrace('calculate.start')
-      console.time('[perf] calculate')
-      calculateAllSafe(workbook)
-      console.timeEnd('[perf] calculate')
-      cpTrace('calculate.done')
+      if (!isLoadStale(loadId, wb)) {
+        cpTrace('calculate.start')
+        console.time('[perf] calculate')
+        calculateAllSafe(wb)
+        console.timeEnd('[perf] calculate')
+        cpTrace('calculate.done')
+      }
     }
+    if (isLoadStale(loadId, wb)) return
 
     // Force readonly when:
     //  1. Parent explicitly says readonly (e.g. lock held by another user), OR
@@ -366,15 +395,16 @@ async function initWorkbook() {
 
     // ── Sheet navigation setup ──────────────────────────────────────────
     cpTrace('postcalc.bindSheetNavEvents.start')
-    bindSheetNavEvents(workbook)
+    bindSheetNavEvents(wb)
     cpTrace('postcalc.bindSheetNavEvents.done')
-    activeSheetIndex.value = workbook.getActiveSheetIndex()
+    activeSheetIndex.value = wb.getActiveSheetIndex()
     cpTrace('postcalc.computeAllSheetStatuses.start')
     computeAllSheetStatuses()
     cpTrace('postcalc.computeAllSheetStatuses.done')
     // Auto-fit the initial sheet after a tick to allow layout to settle
     cpTrace('postcalc.nextTick.start')
     await nextTick()
+    if (isLoadStale(loadId, wb)) return
     cpTrace('postcalc.nextTick.done')
     cpTrace('postcalc.autoFitCurrentSheet.start')
     autoFitCurrentSheet()
@@ -387,12 +417,15 @@ async function initWorkbook() {
     document.addEventListener('click', onDocumentClickDismissCtxMenu)
     cpTrace('postcalc.allDone')
   } catch (e: any) {
+    if (wb && isLoadStale(loadId, wb)) return
     errorMsg.value = '加载模板失败：' + (e?.message ?? '未知错误')
     cpTrace('initWorkbook.catch', { err: String(e?.message ?? e) })
     releaseLockIfOwned()
   } finally {
     cpTrace('initWorkbook.finally.loadingFalse')
-    loading.value = false
+    if (!wb || !isLoadStale(loadId, wb)) {
+      loading.value = false
+    }
   }
 }
 
