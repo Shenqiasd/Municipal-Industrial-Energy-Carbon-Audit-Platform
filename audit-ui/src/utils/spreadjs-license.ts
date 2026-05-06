@@ -1,9 +1,8 @@
 let initialized = false
 
-// Fallback keys bound to sjs.ben-china.org.cn (Railway production).
-// Other deployments (e.g. Tencent Cloud on a different domain) must inject their
-// own keys via Vite build-arg VITE_SPREADJS_LICENSE / VITE_SPREADJS_DESIGNER_LICENSE
-// — see audit-ui/Dockerfile ARG/ENV wiring.
+// Fallback keys are only used when deployment-specific Vite env vars are absent.
+// Domains with their own SpreadJS license, such as Tencent Cloud, should inject
+// VITE_SPREADJS_LICENSE / VITE_SPREADJS_DESIGNER_LICENSE at build time.
 const FALLBACK_SHEETS_KEY =
   'sjs.ben-china.org.cn,E267784365749128#B1UcMBjakdUNvcDOl34VZRETCl7TuxUSJl4VrAnbpNTYjJ6NrRDSqRUWwU7RC3UTvdnWT9mWhVHW0FXNmdDSHBDSvI6RxlkTQNWWEFzdlVFTEV6caZFSmxmUphVVwkzZklkWzpnN4cmWvk4d0VWOYFGURhWYm3SZjJTTGllVoBXOaZDTSVHMP96UDdFczgDT4pEOl3GZ6oUbSRjR4Z7KDhGRyM5VZVHaYdWepVTY6pFTUl5QrE4SPFjQEpERzAFMvZVMsRXYLNndoJ6N7IXYZB7Z8Qld85mSaVzNNdEe4kjbQt4K586NaVjSwcDePRVQBZVV6czYItUV6c4V7EnNV9mQ0dnYTpVa5NzUMxUZ7kmI0IyUiwiI6YEMykzQwEjI0ICSiwCN5cTOxcTN7YTM0IicfJye35XX3JCSJpkQiojIDJCLigTMuYHITpEIkFWZyB7UiojIOJyebpjIkJHUiwiIwUjNyQDMgQTM4AjNyAjMiojI4J7QiwiIwMDNwYjMwIjI0ICc8VkIsIibj9yZy3mLh9WaoNWLuVmYuMnazJiOiMXbEJCLig1jlzahlDZmpnInm/KnmDoimH9pnDblmPron71goLZgm7JtofbtmrIukLiOiEmTDJCLlVnc4pjIsZXRiwiI8ITM9QzN5YzM4gzN7YjMiojIklkIs4XXbpjInxmZiwSZzxWYmpjIyNHZisnOiwmbBJye0ICRiwiI34zZyETSrFlZrQEbRpGbyJFVEtUWChUMwJHaHVzUiZzcOR5SDlFbKVWdOp4QykzZn9WOtV5Uq34cO9ETykVSrFERkZ6MVdgeKN'
 
